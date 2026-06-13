@@ -1,0 +1,312 @@
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function initTabs() {
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const targetId = 'tab-' + tab.dataset.tab;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => {
+        c.classList.add('hidden');
+        c.classList.remove('active');
+      });
+      tab.classList.add('active');
+      const target = document.getElementById(targetId);
+      target.classList.remove('hidden');
+      target.classList.add('active');
+    });
+  });
+}
+
+// ============================================================
+// SETTLEMENT TAB
+// ============================================================
+function renderSuggestions(results) {
+  const el = document.getElementById('suggestions');
+  if (!results.length) { el.classList.add('hidden'); return; }
+  el.innerHTML = results.map(s => {
+    const cls = Settlements.statusClass(s.status);
+    const badges = { yes: '✅ מתקינים', no: '❌ לא מתקינים', check: '⚠️ לבדוק', unknown: '❓ לא זוהה' };
+    return `<div class="suggestion-item" onclick="selectSettlement(${JSON.stringify(s).replace(/"/g, '&quot;')})">
+      <div>
+        <div class="sug-name">${s.name}</div>
+        ${s.type ? `<div class="sug-type">${s.type}</div>` : ''}
+      </div>
+      <span class="sug-badge ${cls}">${badges[cls]}</span>
+    </div>`;
+  }).join('');
+  el.classList.remove('hidden');
+}
+
+function renderSettlementResult(settlement) {
+  const r = Settlements.getResult(settlement);
+  document.getElementById('suggestions').classList.add('hidden');
+  document.getElementById('settlement-result').innerHTML = `
+    <div class="result-card ${r.cls}">
+      <div class="result-icon">${r.icon}</div>
+      <div>
+        <div class="result-settlement">${r.settlement}</div>
+        <div class="result-title">${r.title}</div>
+        ${r.note ? `<div class="result-note">${r.note}</div>` : ''}
+        ${r.showWizardBtn ? `<button class="result-action-btn" onclick="switchToWizard()">המשך לבדיקת כשירות גג ←</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function selectSettlement(settlement) {
+  document.getElementById('settlement-input').value = settlement.name;
+  renderSettlementResult(settlement);
+}
+
+function switchToWizard() {
+  document.querySelector('.tab[data-tab="wizard"]').click();
+}
+
+function initSettlementTab() {
+  const input = document.getElementById('settlement-input');
+  let debounceTimer;
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    document.getElementById('settlement-result').innerHTML = '';
+    debounceTimer = setTimeout(() => {
+      const results = Settlements.search(input.value);
+      renderSuggestions(results);
+    }, 150);
+  });
+  // Hide suggestions when clicking outside
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#tab-settlement')) {
+      document.getElementById('suggestions').classList.add('hidden');
+    }
+  });
+}
+
+// ============================================================
+// WIZARD RENDERING
+// ============================================================
+function renderWizard() {
+  const container = document.getElementById('wizard-container');
+  const s = Wizard.getState();
+  const q = Wizard.currentQuestion();
+
+  if (s.outcome) {
+    container.innerHTML = renderWizardResult();
+    return;
+  }
+
+  const flow = Wizard.currentFlow();
+  const total = flow.length;
+  const current = s.step + 1;
+  const pct = Math.round((s.step / total) * 100);
+
+  let html = `
+    <div class="progress-area">
+      <div class="progress-label"><span>שאלה ${current} מתוך ${total}</span><span>${pct}%</span></div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    </div>`;
+
+  // Previous answers
+  if (s.answers.length > 0) {
+    html += '<div class="prev-answers">';
+    s.answers.forEach(a => {
+      const cls = a.flagClass === 'warn' ? ' warn' : '';
+      html += `<div class="prev-row"><span class="prev-q">${labelForId(a.questionId)}</span><span class="prev-a${cls}">${a.label}</span></div>`;
+    });
+    html += '</div>';
+  }
+
+  // Current question
+  html += `<div class="question-card">
+    <div class="q-step">שאלה ${current} מתוך ${total}</div>
+    <div class="q-text">${q.text}</div>
+    ${q.hint ? `<div class="q-hint">${q.hint}</div>` : ''}
+    ${renderQuestionInput(q)}
+  </div>`;
+
+  html += `<div class="btn-row">
+    <button class="btn reset" onclick="resetWizard()">🔄 התחל מחדש</button>
+  </div>`;
+
+  container.innerHTML = html;
+}
+
+function labelForId(id) {
+  const labels = {
+    'property-type': 'סוג נכס', 'ownership': 'בעלות', 'permit': 'טופס 4',
+    'connection': 'חיבור חשמל', 'meter': 'מונה חשמל', 'roof-type': 'סוג גג',
+    'tiles-age': 'גיל גג רעפים', 'roof-size': 'שטח גג', 'shading': 'הצללות',
+  };
+  return labels[id] || id;
+}
+
+function renderQuestionInput(q) {
+  if (q.type === 'buttons') {
+    return '<div class="answer-row">' +
+      q.options.map((opt, i) =>
+        `<button class="answer-btn" onclick="wizardAnswer(${i})">${opt.label}</button>`
+      ).join('') +
+      '</div>';
+  }
+  if (q.type === 'roof-grid') {
+    return '<div class="roof-grid">' +
+      q.options.map((opt, i) =>
+        `<button class="roof-btn ${opt.flagClass}" onclick="wizardAnswer(${i})">${opt.label}</button>`
+      ).join('') +
+      '</div>';
+  }
+  if (q.type === 'size-input') {
+    return `
+      <div class="size-display" id="size-display">80</div>
+      <div class="size-unit">מ"ר</div>
+      <input type="range" class="size-slider" id="size-slider" min="0" max="250" value="80"
+        oninput="updateSizeDisplay(this.value)">
+      <div class="size-zones">
+        <span style="color:#e63946">0–60<br>❌</span>
+        <span style="color:#e07800">60–70<br>⚠️</span>
+        <span style="color:#2d6a4f">70+<br>✅</span>
+      </div>
+      <div class="size-verdict ok" id="size-verdict">✅ 80 מ"ר — גג מתאים לשיחת מומחה</div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn primary" onclick="wizardSizeConfirm()">אשר שטח גג</button>
+      </div>`;
+  }
+  return '';
+}
+
+function updateSizeDisplay(val) {
+  const v = parseInt(val);
+  document.getElementById('size-display').textContent = v;
+  const verd = document.getElementById('size-verdict');
+  if (v >= CONFIG.ROOF_SIZE_GOOD) {
+    verd.className = 'size-verdict ok';
+    verd.textContent = `✅ ${v} מ"ר — גג מתאים לשיחת מומחה`;
+  } else if (v >= CONFIG.ROOF_SIZE_BORDERLINE) {
+    verd.className = 'size-verdict warn';
+    verd.textContent = `⚠️ ${v} מ"ר — גבולי, המומחה יאשר`;
+  } else {
+    verd.className = 'size-verdict bad';
+    verd.textContent = `❌ ${v} מ"ר — קטן מדי (מינימום 60 מ"ר)`;
+  }
+}
+
+function wizardAnswer(optionIndex) {
+  const q = Wizard.currentQuestion();
+  const opt = q.options[optionIndex];
+  Wizard.answer(opt);
+  renderWizard();
+}
+
+function wizardSizeConfirm() {
+  const val = document.getElementById('size-slider').value;
+  Wizard.answer({}, val);
+  renderWizard();
+}
+
+function resetWizard() {
+  Wizard.reset();
+  renderWizard();
+}
+
+function renderWizardResult() {
+  const s = Wizard.getState();
+
+  // Answers recap
+  const recap = s.answers.map(a => {
+    const cls = a.flagClass === 'warn' ? ' warn' : '';
+    return `<div class="recap-row"><span class="recap-q">${labelForId(a.questionId)}</span><span class="recap-v${cls}">${a.label}</span></div>`;
+  }).join('');
+
+  if (s.outcome === 'go') {
+    return `<div class="wizard-result go">
+      <div class="wr-header"><div class="wr-icon">✅</div><div class="wr-title">ניתן לתאם שיחת מומחה</div></div>
+      <div class="answers-recap">${recap}</div>
+      <div class="btn-row">
+        <button class="btn primary">📅 תאם שיחת מומחה</button>
+        <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
+      </div>
+    </div>`;
+  }
+
+  if (s.outcome === 'go-notes') {
+    const flags = s.flags.map(f => `<div class="flag-box"><span class="flag-icon">📌</span><span>${f}</span></div>`).join('');
+    return `<div class="wizard-result go-notes">
+      <div class="wr-header"><div class="wr-icon">⚠️</div><div class="wr-title">ניתן לקדם — שים לב להערות</div></div>
+      <div class="answers-recap">${recap}</div>
+      ${flags}
+      <div class="btn-row">
+        <button class="btn primary">📅 תאם שיחת מומחה</button>
+        <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
+      </div>
+    </div>`;
+  }
+
+  if (s.outcome === 'follow-up') {
+    return `<div class="wizard-result follow-up">
+      <div class="wr-header"><div class="wr-icon">📋</div><div class="wr-title">לא ניתן לתאם כעת — שתי אפשרויות</div></div>
+      <div class="action-box"><div class="action-title">🔴 הבעיה: אין טופס 4 בתוקף</div>
+        <div class="action-text">לא ניתן לחבר מערכת סולארית לרשת ללא טופס 4.</div></div>
+      <div class="action-box"><div class="action-title">אפשרות א׳ — פולואפ עתידי</div>
+        <div class="action-text">לקבוע עם הלקוח מתי צפוי טופס 4, ולתזמן פולואפ.</div></div>
+      <div class="action-box"><div class="action-title">אפשרות ב׳ — העברה ל-VSD</div>
+        <div class="action-text">אם הלקוח מעוניין בתכנון ראשוני כבר עכשיו — להעביר לשיחת VSD.</div></div>
+      <div class="btn-row">
+        <button class="btn secondary">📅 קבע פולואפ לתאריך</button>
+        <button class="btn vsd">↗ העבר ל-VSD</button>
+        <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
+      </div>
+    </div>`;
+  }
+
+  if (s.outcome === 'escalate') {
+    return `<div class="wizard-result escalate">
+      <div class="wr-header"><div class="wr-icon">🔼</div><div class="wr-title">יש להעלות למנהל לפני קידום</div></div>
+      <div class="answers-recap">${recap}</div>
+      <div class="action-box"><div class="action-title">סיבה</div>
+        <div class="action-text">${s.escalateNote || ''}</div></div>
+      <div class="btn-row">
+        <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
+      </div>
+    </div>`;
+  }
+
+  // stop
+  return `<div class="wizard-result stop">
+    <div class="wr-header"><div class="wr-icon">❌</div><div class="wr-title">לא ניתן להתקין</div></div>
+    <div class="answers-recap">${recap}</div>
+    <div class="action-box">
+      <div class="action-title">🔴 הסיבה</div>
+      <div class="action-text">${s.stopReason}</div>
+    </div>
+    ${s.stopScript ? `<div class="flag-box"><span class="flag-icon">💬</span><span>נוסח לנציג: <em>"${s.stopScript}"</em></span></div>` : ''}
+    <div class="btn-row">
+      <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
+    </div>
+  </div>`;
+}
+
+function initWizard() {
+  Wizard.reset();
+  renderWizard();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  initTabs();
+  initSettlementTab();
+
+  const statusEl = document.getElementById('data-status');
+  statusEl.textContent = 'טוען נתוני יישובים...';
+  const result = await Settlements.load();
+  if (result.ok) {
+    statusEl.textContent = `✓ ${result.count} יישובים נטענו`;
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  } else {
+    statusEl.textContent = `⚠️ לא ניתן לטעון נתונים — בדוק חיבור אינטרנט`;
+  }
+
+  if (typeof initWizard === 'function') initWizard();
+}
+
+document.addEventListener('DOMContentLoaded', init);
