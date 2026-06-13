@@ -1,0 +1,227 @@
+// ============================================================
+// WIZARD STATE MACHINE
+// ============================================================
+const Wizard = (() => {
+  // State
+  let state = {
+    step: 0,
+    answers: [],   // [{questionId, label, value, flagClass}]
+    flags: [],     // warning strings shown in result
+    outcome: null, // 'go'|'go-notes'|'follow-up'|'stop'|'escalate'
+    stopReason: '',
+    stopScript: '',
+  };
+
+  const QUESTIONS = [
+    {
+      id: 'property-type',
+      text: 'מה סוג הנכס?',
+      hint: 'דירה בבניין משותף — בדרך כלל לא מתאימה',
+      type: 'buttons',
+      options: [
+        { label: '🏠 בית פרטי / דו-משפחתי', value: 'private', flagClass: 'ok', action: null },
+        { label: '🏢 קונדו בבעלות פרטית', value: 'condo-private', flagClass: 'warn',
+          action: 'flag', flagMsg: 'קונדו בבעלות פרטית — יש לוודא שיש גישה לגג' },
+        { label: '🏗 קונדו בבעלות משותפת', value: 'condo-shared', flagClass: 'bad',
+          action: 'stop',
+          stopReason: 'קונדו בבעלות משותפת — לא מתאים להתקנה',
+          stopScript: 'אנחנו מתקינים על בתים פרטיים — בבניין משותף יש מגבלות רגולטוריות שמונעות זאת כרגע.' },
+      ],
+    },
+    {
+      id: 'ownership',
+      text: 'האם הנכס בבעלות הלקוח?',
+      hint: 'שוכרים אינם יכולים לחתום על חוזה התקנה',
+      type: 'buttons',
+      options: [
+        { label: '✅ כן, בבעלותי', value: 'yes', flagClass: 'ok', action: null },
+        { label: '❌ לא, שכירות', value: 'no', flagClass: 'bad',
+          action: 'stop',
+          stopReason: 'הנכס אינו בבעלות הלקוח',
+          stopScript: 'כדי להתקין מערכת סולארית חייבים להיות הבעלים של הנכס. בהצלחה!' },
+      ],
+    },
+    {
+      id: 'permit',
+      text: 'האם יש טופס 4 / היתר בניה לנכס?',
+      hint: 'ללא טופס 4 לא ניתן לחבר מערכת לרשת החשמל',
+      type: 'buttons',
+      options: [
+        { label: '✅ יש טופס 4', value: 'yes', flagClass: 'ok', action: null },
+        { label: '⏳ בהמשך / בתהליך', value: 'pending', flagClass: 'warn',
+          action: 'follow-up',
+          followUpNote: 'הסבר ללקוח: חיבור לרשת דורש טופס 4 בתוקף. אפשרויות: (א) לקבוע פולואפ לתאריך שהטופס צפוי. (ב) אם רוצה תכנון ראשוני כבר עכשיו — להעביר ל-VSD.' },
+        { label: '❌ אין', value: 'no', flagClass: 'bad',
+          action: 'follow-up',
+          followUpNote: 'הסבר ללקוח: חיבור לרשת דורש טופס 4 בתוקף. אפשרויות: (א) לקבוע פולואפ לתאריך שהטופס צפוי. (ב) אם רוצה תכנון ראשוני כבר עכשיו — להעביר ל-VSD.' },
+      ],
+    },
+    {
+      id: 'connection',
+      text: 'חיבור לחברת חשמל?',
+      hint: 'חיבור זמני = לא ניתן להתקין',
+      type: 'buttons',
+      options: [
+        { label: '✅ חיבור קבע', value: 'permanent', flagClass: 'ok', action: null },
+        { label: '❌ חיבור זמני / אין', value: 'no', flagClass: 'bad',
+          action: 'stop',
+          stopReason: 'אין חיבור קבע לחברת חשמל',
+          stopScript: 'להתקנה נדרש חיבור קבע לחברת חשמל. ניתן לחזור אלינו לאחר שהחיבור הוסדר.' },
+      ],
+    },
+    {
+      id: 'meter',
+      text: 'היכן נמצא מונה החשמל?',
+      hint: 'מונה בתוך הבית מצריך שדרוג למונה חכם',
+      type: 'buttons',
+      options: [
+        { label: '✅ מחוץ לבית', value: 'outside', flagClass: 'ok', action: null },
+        { label: '⚠️ בתוך הבית', value: 'inside', flagClass: 'warn',
+          action: 'flag',
+          flagMsg: 'מונה חשמל בתוך הבית — יידרש מונה חכם. הלקוח הסכים להמשיך.' },
+      ],
+    },
+    {
+      id: 'roof-type',
+      text: 'מה סוג הגג?',
+      hint: '',
+      type: 'roof-grid',
+      options: [
+        { label: '🟫 בטון שטוח',         value: 'concrete',   flagClass: 'ok',   action: null },
+        { label: '🔺 רעפים',              value: 'tiles',      flagClass: 'ok',   action: 'tiles-age' },
+        { label: '↕ רעפים + בטון',       value: 'mixed',      flagClass: 'ok',   action: null },
+        { label: '☀️ פרגולה סולארית',    value: 'pergola',    flagClass: 'ok',
+          action: 'flag', flagMsg: 'פרגולה סולארית — פאנלים מיוחדים, המומחה יאשר את הסוג' },
+        { label: '🔧 פאנל מבודד',         value: 'insulated',  flagClass: 'warn',
+          action: 'escalate',
+          escalateNote: 'פאנל מבודד — נדרש אישור מנהל. יש מקרים שהושלמו בהצלחה.' },
+        { label: '🏗 איסכורית',           value: 'corrugated', flagClass: 'warn',
+          action: 'flag', flagMsg: 'איסכורית — נדרש אישור קונסטרוקטור לחוזק הגג. המומחה יבדוק.' },
+        { label: '❌ בנייה קלה / מייטק',  value: 'light',      flagClass: 'bad',
+          action: 'stop',
+          stopReason: 'בנייה קלה / מייטק — לא מתאים להתקנה',
+          stopScript: 'לצערנו לא מתקינים על גגות בנייה קלה או מייטק. תודה על הפנייה!' },
+      ],
+    },
+    {
+      id: 'tiles-age',
+      text: 'מה גיל גג הרעפים (שנים)?',
+      hint: 'גג ישן מעל 25 שנה דורש בדיקת חוזק — המומחה יאשר',
+      type: 'buttons',
+      options: [
+        { label: '📅 עד 25 שנה', value: 'young', flagClass: 'ok', action: null },
+        { label: '📅 מעל 25 שנה', value: 'old', flagClass: 'warn',
+          action: 'flag', flagMsg: 'גג רעפים מעל 25 שנה — המומחה יבדוק חוזק הגג' },
+        { label: '❓ לא יודע', value: 'unknown', flagClass: 'warn',
+          action: 'flag', flagMsg: 'גיל גג רעפים לא ידוע — המומחה יבדוק' },
+      ],
+    },
+    {
+      id: 'roof-size',
+      text: 'מה שטח הגג המשוער?',
+      hint: 'ניתן לתת הערכה גסה — לא חייב לדייק',
+      type: 'size-input',
+      options: [],
+    },
+    {
+      id: 'shading',
+      text: 'האם יש הצללות על הגג?',
+      hint: 'עצים, מבנים שכנים, מיתקנים על הגג',
+      type: 'buttons',
+      options: [
+        { label: '☀️ אין הצללות', value: 'none', flagClass: 'ok', action: null },
+        { label: '🌤 הצללה חלקית', value: 'partial', flagClass: 'warn',
+          action: 'flag', flagMsg: 'הצללה חלקית על הגג — המומחה יעריך השפעה על יעילות' },
+        { label: '🌥 הצללה משמעותית', value: 'heavy', flagClass: 'bad',
+          action: 'escalate',
+          escalateNote: 'הצללה משמעותית — יש לדון עם מנהל לפני קידום' },
+      ],
+    },
+  ];
+
+  const MAIN_FLOW = ['property-type','ownership','permit','connection','meter','roof-type','roof-size','shading'];
+
+  function getQuestion(id) {
+    return QUESTIONS.find(q => q.id === id);
+  }
+
+  function reset() {
+    state = { step: 0, answers: [], flags: [], outcome: null, stopReason: '', stopScript: '' };
+  }
+
+  function buildFlow() {
+    const flow = [...MAIN_FLOW];
+    const roofAnswer = state.answers.find(a => a.questionId === 'roof-type');
+    if (roofAnswer && roofAnswer.value === 'tiles') {
+      const idx = flow.indexOf('roof-size');
+      flow.splice(idx, 0, 'tiles-age');
+    }
+    return flow;
+  }
+
+  function currentFlow() { return buildFlow(); }
+
+  function currentQuestion() {
+    const flow = currentFlow();
+    if (state.step >= flow.length) return null;
+    return getQuestion(flow[state.step]);
+  }
+
+  function answer(option, sizeValue) {
+    const q = currentQuestion();
+    const label = option.label || sizeValue + ' מ"ר';
+    const value = option.value || sizeValue;
+
+    let flagClass = option.flagClass || 'ok';
+    let answerLabel = label;
+
+    if (q.id === 'roof-size') {
+      const sz = parseInt(sizeValue);
+      if (sz >= CONFIG.ROOF_SIZE_GOOD) { flagClass = 'ok'; answerLabel = sz + ' מ"ר ✅'; }
+      else if (sz >= CONFIG.ROOF_SIZE_BORDERLINE) {
+        flagClass = 'warn'; answerLabel = sz + ' מ"ר ⚠️';
+        state.flags.push('שטח גג ' + sz + ' מ"ר — גבולי. המומחה יאשר התאמה');
+      } else {
+        state.answers.push({ questionId: q.id, label: answerLabel, value, flagClass });
+        state.outcome = 'stop';
+        state.stopReason = 'שטח גג ' + sz + ' מ"ר — קטן מדי להתקנה (מינימום 60 מ"ר)';
+        state.stopScript = 'לצערנו שטח הגג לא מספיק גדול להתקנה מערכת סולארית. נדרש לפחות 60 מ"ר.';
+        return { done: true };
+      }
+    }
+
+    state.answers.push({ questionId: q.id, label: answerLabel, value, flagClass });
+
+    if (option.action === 'stop') {
+      state.outcome = 'stop';
+      state.stopReason = option.stopReason;
+      state.stopScript = option.stopScript;
+      return { done: true };
+    }
+    if (option.action === 'follow-up') {
+      state.outcome = 'follow-up';
+      state.followUpNote = option.followUpNote;
+      return { done: true };
+    }
+    if (option.action === 'escalate') {
+      state.outcome = 'escalate';
+      state.escalateNote = option.escalateNote;
+      return { done: true };
+    }
+    if (option.action === 'flag') {
+      if (option.flagMsg) state.flags.push(option.flagMsg);
+    }
+
+    state.step++;
+    const flow = currentFlow();
+    if (state.step >= flow.length) {
+      state.outcome = state.flags.length > 0 ? 'go-notes' : 'go';
+      return { done: true };
+    }
+    return { done: false };
+  }
+
+  function getState() { return state; }
+
+  return { reset, currentQuestion, currentFlow, answer, getState };
+})();
