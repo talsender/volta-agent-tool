@@ -12,6 +12,7 @@ const Wizard = (() => {
     stopScript: '',
     escalateNote: '',
     followUpNote: '',
+    selectedRoofTypes: [],
   };
 
   const QUESTIONS = [
@@ -85,13 +86,12 @@ const Wizard = (() => {
     },
     {
       id: 'roof-type',
-      text: 'מה סוג הגג?',
-      hint: '',
-      type: 'roof-grid',
+      text: 'מה סוג/י הגג?',
+      hint: 'אפשר לבחור כמה חלקים — לדוגמה פרגולה + בטון שטוח',
+      type: 'roof-grid-multi',
       options: [
         { label: '🟫 בטון שטוח',         value: 'concrete',   flagClass: 'ok',   action: null },
         { label: '🔺 רעפים',              value: 'tiles',      flagClass: 'ok',   action: 'tiles-age' },
-        { label: '↕ רעפים + בטון',       value: 'mixed',      flagClass: 'ok',   action: null },
         { label: '☀️ פרגולה סולארית',    value: 'pergola',    flagClass: 'ok',
           action: 'flag', flagMsg: 'פרגולה סולארית — פאנלים מיוחדים, המומחה יאשר את הסוג' },
         { label: '🔧 פאנל מבודד',         value: 'insulated',  flagClass: 'warn',
@@ -148,17 +148,67 @@ const Wizard = (() => {
   }
 
   function reset() {
-    state = { step: 0, answers: [], flags: [], outcome: null, stopReason: '', stopScript: '', escalateNote: '', followUpNote: '' };
+    state = { step: 0, answers: [], flags: [], outcome: null, stopReason: '', stopScript: '', escalateNote: '', followUpNote: '', selectedRoofTypes: [] };
   }
 
   function buildFlow() {
     const flow = [...MAIN_FLOW];
-    const roofAnswer = state.answers.find(a => a.questionId === 'roof-type');
-    if (roofAnswer && roofAnswer.value === 'tiles') {
+    const hasTiles = state.selectedRoofTypes.some(t => t.value === 'tiles') ||
+      state.answers.some(a => a.questionId === 'roof-type' && a.value === 'tiles');
+    if (hasTiles) {
       const idx = flow.indexOf('roof-size');
       flow.splice(idx, 0, 'tiles-age');
     }
     return flow;
+  }
+
+  // Toggle a roof type in the multi-select (called from UI)
+  function toggleRoofType(optionIndex) {
+    const q = QUESTIONS.find(q => q.id === 'roof-type');
+    const opt = q.options[optionIndex];
+    const existing = state.selectedRoofTypes.findIndex(t => t.value === opt.value);
+    if (existing >= 0) {
+      state.selectedRoofTypes.splice(existing, 1);
+    } else {
+      state.selectedRoofTypes.push(opt);
+    }
+  }
+
+  // Confirm multi-roof selection and evaluate all selected types
+  function confirmRoofTypes() {
+    if (state.selectedRoofTypes.length === 0) return { done: false, error: 'בחר לפחות סוג גג אחד' };
+    const q = QUESTIONS.find(q => q.id === 'roof-type');
+    const selected = state.selectedRoofTypes;
+    const labels = selected.map(t => t.label).join(' + ');
+
+    // Evaluate worst case: stop > escalate > flag > ok
+    const stopOpt  = selected.find(t => t.action === 'stop');
+    const escalOpt = selected.find(t => t.action === 'escalate');
+    const flags    = selected.filter(t => t.action === 'flag');
+
+    const worstClass = stopOpt ? 'bad' : escalOpt ? 'warn' : flags.length ? 'warn' : 'ok';
+    state.answers.push({ questionId: 'roof-type', label: labels, value: selected.map(t => t.value).join('+'), flagClass: worstClass });
+
+    if (stopOpt) {
+      state.outcome = 'stop';
+      state.stopReason = stopOpt.stopReason;
+      state.stopScript = stopOpt.stopScript;
+      return { done: true };
+    }
+    if (escalOpt) {
+      state.outcome = 'escalate';
+      state.escalateNote = escalOpt.escalateNote;
+      return { done: true };
+    }
+    flags.forEach(t => { if (t.flagMsg) state.flags.push(t.flagMsg); });
+
+    state.step++;
+    const flow = buildFlow();
+    if (state.step >= flow.length) {
+      state.outcome = state.flags.length > 0 ? 'go-notes' : 'go';
+      return { done: true };
+    }
+    return { done: false };
   }
 
   function currentFlow() { return buildFlow(); }
@@ -226,5 +276,5 @@ const Wizard = (() => {
 
   function getState() { return state; }
 
-  return { reset, currentQuestion, currentFlow, answer, getState };
+  return { reset, currentQuestion, currentFlow, answer, getState, toggleRoofType, confirmRoofTypes };
 })();

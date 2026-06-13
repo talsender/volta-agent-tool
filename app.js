@@ -49,12 +49,18 @@ function renderSuggestions(results) {
 function renderSettlementResult(settlement) {
   const r = Settlements.getResult(settlement);
   document.getElementById('suggestions').classList.add('hidden');
+  let installBadge = '';
+  if (r.installCount > 0) {
+    const lastTxt = r.lastInstall ? ` · אחרונה: ${escHtml(r.lastInstall)}` : '';
+    installBadge = `<div class="install-badge">📍 ${r.installCount} פרויקטים הושלמו אצלנו ביישוב זה${lastTxt}</div>`;
+  }
   document.getElementById('settlement-result').innerHTML = `
     <div class="result-card ${r.cls}">
       <div class="result-icon">${r.icon}</div>
       <div>
         <div class="result-settlement">${escHtml(r.settlement)}</div>
         <div class="result-title">${escHtml(r.title)}</div>
+        ${installBadge}
         ${r.note ? `<div class="result-note">${escHtml(r.note)}</div>` : ''}
         ${r.showWizardBtn ? `<button class="result-action-btn" onclick="switchToWizard()">המשך לבדיקת כשירות גג ←</button>` : ''}
       </div>
@@ -166,6 +172,18 @@ function renderQuestionInput(q) {
       ).join('') +
       '</div>';
   }
+  if (q.type === 'roof-grid-multi') {
+    const selected = Wizard.getState().selectedRoofTypes;
+    const btns = q.options.map((opt, i) => {
+      const isSel = selected.some(t => t.value === opt.value);
+      return `<button class="roof-btn ${opt.flagClass}${isSel ? ' selected' : ''}" onclick="wizardToggleRoof(${i})">${opt.label}</button>`;
+    }).join('');
+    return `<div class="roof-grid">${btns}</div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn primary" onclick="wizardConfirmRoofs()">אשר בחירת גג</button>
+      </div>
+      <div id="roof-multi-error" style="color:#e63946;font-size:13px;margin-top:8px;text-align:center;min-height:18px;"></div>`;
+  }
   if (q.type === 'size-input') {
     return `
       <div class="size-display" id="size-display">80</div>
@@ -211,6 +229,21 @@ function wizardAnswer(optionIndex) {
 function wizardSizeConfirm() {
   const val = document.getElementById('size-slider').value;
   Wizard.answer({}, val);
+  renderWizard();
+}
+
+function wizardToggleRoof(i) {
+  Wizard.toggleRoofType(i);
+  renderWizard();
+}
+
+function wizardConfirmRoofs() {
+  const result = Wizard.confirmRoofTypes();
+  if (!result.done && result.error) {
+    const errEl = document.getElementById('roof-multi-error');
+    if (errEl) errEl.textContent = result.error;
+    return;
+  }
   renderWizard();
 }
 

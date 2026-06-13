@@ -30,14 +30,16 @@ const Settlements = (() => {
       }
       cols.push(cur.trim());
       return {
-        name:    cols[0] || '',
-        type:    cols[1] || '',
-        status:  cols[2] || '',
-        aliases: (cols[3] || '').split(',').map(s => s.trim()).filter(Boolean),
-        action:  cols[4] || '',
-        note:    cols[5] || '',
-        source:  cols[6] || '',
-        updated: cols[7] || '',
+        name:         cols[0] || '',
+        type:         cols[1] || '',
+        status:       cols[2] || '',
+        aliases:      (cols[3] || '').split(',').map(s => s.trim()).filter(Boolean),
+        action:       cols[4] || '',
+        note:         cols[5] || '',
+        source:       cols[6] || '',
+        updated:      cols[7] || '',
+        installCount: parseInt(cols[8]) || 0,
+        lastInstall:  cols[9] || '',
       };
     }).filter(s => s.name);
   }
@@ -103,6 +105,8 @@ const Settlements = (() => {
       settlement: `${settlement.name}${settlement.type ? ' · ' + settlement.type : ''}`,
       note: settlement.note || settlement.action || '',
       showWizardBtn: cls === 'yes',
+      installCount: settlement.installCount || 0,
+      lastInstall:  settlement.lastInstall || '',
     };
   }
 

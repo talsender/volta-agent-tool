@@ -130,6 +130,17 @@ body {
 
 .result-settlement { font-size: 13px; font-weight: 700; color: #555; margin-bottom: 6px; }
 .result-note { font-size: 13px; color: #555; line-height: 1.6; }
+.install-badge {
+  display: inline-block;
+  margin: 6px 0 4px;
+  padding: 4px 10px;
+  background: #d8f3dc;
+  border: 1px solid #74c69d;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1b4332;
+}
 .result-action-btn {
   display: inline-block;
   margin-top: 12px;
@@ -215,6 +226,7 @@ body {
 .roof-btn.ok   { background: #d8f3dc; border-color: #52b788; }
 .roof-btn.warn { background: #fff3cd; border-color: #f4a261; }
 .roof-btn.bad  { background: #ffe8e8; border-color: #e63946; }
+.roof-btn.selected { box-shadow: 0 0 0 3px #2d6a4f; font-weight: 800; transform: scale(1.02); }
 
 .size-display { font-size: 38px; font-weight: 800; color: #1b4332; text-align: center; margin: 10px 0 2px; }
 .size-unit { font-size: 13px; color: #888; text-align: center; margin-bottom: 10px; }
