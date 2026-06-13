@@ -14,7 +14,7 @@ const Settlements = (() => {
 
   // Parse CSV text into array of settlement objects
   function parseCSV(text) {
-    const lines = text.split('\n').filter(l => l.trim());
+    const lines = text.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim());
     if (lines.length < 2) return [];
     // Skip header row (row 0)
     return lines.slice(1).map(line => {

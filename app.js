@@ -1,3 +1,7 @@
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // ============================================================
 // TAB SWITCHING
 // ============================================================
@@ -21,16 +25,20 @@ function initTabs() {
 // ============================================================
 // SETTLEMENT TAB
 // ============================================================
+let _suggestionCache = [];
+
 function renderSuggestions(results) {
   const el = document.getElementById('suggestions');
-  if (!results.length) { el.classList.add('hidden'); return; }
-  el.innerHTML = results.map(s => {
-    const cls = Settlements.statusClass(s.status);
-    const badges = { yes: '✅ מתקינים', no: '❌ לא מתקינים', check: '⚠️ לבדוק', unknown: '❓ לא זוהה' };
-    return `<div class="suggestion-item" onclick="selectSettlement(${JSON.stringify(s).replace(/"/g, '&quot;')})">
+  if (!results.length) { el.classList.add('hidden'); _suggestionCache = []; return; }
+  _suggestionCache = results;
+  const cls_fn = Settlements.statusClass;
+  const badges = { yes: '✅ מתקינים', no: '❌ לא מתקינים', check: '⚠️ לבדוק', unknown: '❓ לא זוהה' };
+  el.innerHTML = results.map((s, i) => {
+    const cls = cls_fn(s.status);
+    return `<div class="suggestion-item" onclick="selectSettlement(_suggestionCache[${i}])">
       <div>
-        <div class="sug-name">${s.name}</div>
-        ${s.type ? `<div class="sug-type">${s.type}</div>` : ''}
+        <div class="sug-name">${escHtml(s.name)}</div>
+        ${s.type ? `<div class="sug-type">${escHtml(s.type)}</div>` : ''}
       </div>
       <span class="sug-badge ${cls}">${badges[cls]}</span>
     </div>`;
@@ -45,9 +53,9 @@ function renderSettlementResult(settlement) {
     <div class="result-card ${r.cls}">
       <div class="result-icon">${r.icon}</div>
       <div>
-        <div class="result-settlement">${r.settlement}</div>
-        <div class="result-title">${r.title}</div>
-        ${r.note ? `<div class="result-note">${r.note}</div>` : ''}
+        <div class="result-settlement">${escHtml(r.settlement)}</div>
+        <div class="result-title">${escHtml(r.title)}</div>
+        ${r.note ? `<div class="result-note">${escHtml(r.note)}</div>` : ''}
         ${r.showWizardBtn ? `<button class="result-action-btn" onclick="switchToWizard()">המשך לבדיקת כשירות גג ←</button>` : ''}
       </div>
     </div>`;
@@ -128,6 +136,10 @@ function renderWizard() {
   </div>`;
 
   container.innerHTML = html;
+  if (q && q.type === 'size-input') {
+    const slider = document.getElementById('size-slider');
+    if (slider) setTimeout(() => updateSizeDisplay(slider.value), 0);
+  }
 }
 
 function labelForId(id) {
@@ -165,7 +177,7 @@ function renderQuestionInput(q) {
         <span style="color:#e07800">60–70<br>⚠️</span>
         <span style="color:#2d6a4f">70+<br>✅</span>
       </div>
-      <div class="size-verdict ok" id="size-verdict">✅ 80 מ"ר — גג מתאים לשיחת מומחה</div>
+      <div class="size-verdict ok" id="size-verdict"></div>
       <div class="btn-row" style="margin-top:14px">
         <button class="btn primary" onclick="wizardSizeConfirm()">אשר שטח גג</button>
       </div>`;
@@ -241,12 +253,12 @@ function renderWizardResult() {
   }
 
   if (s.outcome === 'follow-up') {
+    const note = s.followUpNote || 'נדרשת פעולה נוספת לפני תיאום שיחת מומחה.';
     return `<div class="wizard-result follow-up">
       <div class="wr-header"><div class="wr-icon">📋</div><div class="wr-title">לא ניתן לתאם כעת — שתי אפשרויות</div></div>
-      <div class="action-box"><div class="action-title">🔴 הבעיה: אין טופס 4 בתוקף</div>
-        <div class="action-text">לא ניתן לחבר מערכת סולארית לרשת ללא טופס 4.</div></div>
+      <div class="action-box"><div class="action-text">${escHtml(note)}</div></div>
       <div class="action-box"><div class="action-title">אפשרות א׳ — פולואפ עתידי</div>
-        <div class="action-text">לקבוע עם הלקוח מתי צפוי טופס 4, ולתזמן פולואפ.</div></div>
+        <div class="action-text">לקבוע עם הלקוח מתי צפוי לסדר את הנושא, ולתזמן פולואפ.</div></div>
       <div class="action-box"><div class="action-title">אפשרות ב׳ — העברה ל-VSD</div>
         <div class="action-text">אם הלקוח מעוניין בתכנון ראשוני כבר עכשיו — להעביר לשיחת VSD.</div></div>
       <div class="btn-row">

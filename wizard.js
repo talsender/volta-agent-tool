@@ -5,11 +5,13 @@ const Wizard = (() => {
   // State
   let state = {
     step: 0,
-    answers: [],   // [{questionId, label, value, flagClass}]
-    flags: [],     // warning strings shown in result
-    outcome: null, // 'go'|'go-notes'|'follow-up'|'stop'|'escalate'
+    answers: [],
+    flags: [],
+    outcome: null,
     stopReason: '',
     stopScript: '',
+    escalateNote: '',
+    followUpNote: '',
   };
 
   const QUESTIONS = [
@@ -146,7 +148,7 @@ const Wizard = (() => {
   }
 
   function reset() {
-    state = { step: 0, answers: [], flags: [], outcome: null, stopReason: '', stopScript: '' };
+    state = { step: 0, answers: [], flags: [], outcome: null, stopReason: '', stopScript: '', escalateNote: '', followUpNote: '' };
   }
 
   function buildFlow() {
@@ -182,6 +184,7 @@ const Wizard = (() => {
         flagClass = 'warn'; answerLabel = sz + ' מ"ר ⚠️';
         state.flags.push('שטח גג ' + sz + ' מ"ר — גבולי. המומחה יאשר התאמה');
       } else {
+        flagClass = 'bad';
         state.answers.push({ questionId: q.id, label: answerLabel, value, flagClass });
         state.outcome = 'stop';
         state.stopReason = 'שטח גג ' + sz + ' מ"ר — קטן מדי להתקנה (מינימום 60 מ"ר)';
