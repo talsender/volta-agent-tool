@@ -31,9 +31,9 @@ const Settlements = (() => {
       cols.push(cur.trim());
       return {
         name:    cols[0] || '',
-        aliases: (cols[1] || '').split(',').map(s => s.trim()).filter(Boolean),
-        type:    cols[2] || '',
-        status:  cols[3] || '',
+        type:    cols[1] || '',
+        status:  cols[2] || '',
+        aliases: (cols[3] || '').split(',').map(s => s.trim()).filter(Boolean),
         action:  cols[4] || '',
         note:    cols[5] || '',
         source:  cols[6] || '',
