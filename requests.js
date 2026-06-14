@@ -24,7 +24,26 @@ const Requests = (() => {
     });
   }
 
-  return { normalizeName, mergeOverrides };
+  function buildRequest({ type, agent, subject, reason, context }) {
+    if (!agent || !agent.id) throw new Error('agent required');
+    if (!reason || !reason.trim()) throw new Error('reason required');
+    if (type !== 'settlement' && type !== 'roof') throw new Error('invalid type');
+    return {
+      type,
+      agentId: agent.id,
+      agentName: agent.name || '',
+      subject: subject || '',
+      reason: reason.trim(),
+      context: context || {},
+      status: 'pending',
+      resolution: null,
+      managerNote: '',
+      createdAt: Date.now(),
+      resolvedAt: null,
+    };
+  }
+
+  return { normalizeName, mergeOverrides, buildRequest };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Requests;

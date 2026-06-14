@@ -27,3 +27,32 @@ test('mergeOverrides ללא overrides מחזיר את המקור', () => {
   const settlements = [{ name: 'אילת', status: 'מתקינים', note: '' }];
   assert.deepStrictEqual(Requests.mergeOverrides(settlements, null), settlements);
 });
+
+test('buildRequest בונה בקשת יישוב תקינה עם status pending', () => {
+  const agent = { id: 'a1', name: 'דני' };
+  const req = Requests.buildRequest({
+    type: 'settlement', agent, subject: 'דימונה',
+    reason: ' יש לנו לקוח גדול ', context: { status: 'לא מתקינים' },
+  });
+  assert.strictEqual(req.type, 'settlement');
+  assert.strictEqual(req.agentId, 'a1');
+  assert.strictEqual(req.agentName, 'דני');
+  assert.strictEqual(req.subject, 'דימונה');
+  assert.strictEqual(req.reason, 'יש לנו לקוח גדול'); // trimmed
+  assert.deepStrictEqual(req.context, { status: 'לא מתקינים' });
+  assert.strictEqual(req.status, 'pending');
+  assert.strictEqual(req.resolution, null);
+  assert.strictEqual(typeof req.createdAt, 'number');
+});
+
+test('buildRequest זורק כשחסר נימוק', () => {
+  assert.throws(() => Requests.buildRequest({
+    type: 'roof', agent: { id: 'a1' }, subject: 's', reason: '   ',
+  }), /reason/);
+});
+
+test('buildRequest זורק על type לא חוקי', () => {
+  assert.throws(() => Requests.buildRequest({
+    type: 'bogus', agent: { id: 'a1' }, reason: 'x',
+  }), /type/);
+});
