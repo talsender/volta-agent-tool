@@ -386,7 +386,12 @@ function updateMaterialSizes() {
   if (totalEl) totalEl.textContent = `סה"כ: ${sum} מ"ר`;
   const v = document.getElementById('msize-verdict');
   if (!v) return;
-  const good = CONFIG.ROOF_SIZE_GOOD, border = CONFIG.ROOF_SIZE_BORDERLINE;
+  // Read the same thresholds evaluateRoof uses, so the live preview matches the
+  // authoritative result (and stays correct when roofConfig is manager-edited).
+  const th = (typeof DEFAULT_ROOF_CONFIG !== 'undefined' && DEFAULT_ROOF_CONFIG.totalSizeThresholds)
+    ? DEFAULT_ROOF_CONFIG.totalSizeThresholds
+    : { good: CONFIG.ROOF_SIZE_GOOD, borderline: CONFIG.ROOF_SIZE_BORDERLINE };
+  const good = th.good, border = th.borderline;
   if (sum >= good) { v.className = 'msize-verdict ok'; v.textContent = `✅ ${sum} מ"ר — שטח מתאים`; }
   else if (sum >= border) { v.className = 'msize-verdict warn'; v.textContent = `⚠️ ${sum} מ"ר — גבולי, המומחה יאשר`; }
   else { v.className = 'msize-verdict bad'; v.textContent = `❌ ${sum} מ"ר — קטן מדי (מינימום ${border} מ"ר)`; }
