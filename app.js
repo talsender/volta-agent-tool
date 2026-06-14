@@ -253,7 +253,7 @@ function labelForId(id) {
   const labels = {
     'property-type': 'סוג נכס', 'ownership': 'בעלות', 'permit': 'טופס 4',
     'connection': 'חיבור חשמל', 'meter': 'מונה חשמל', 'roof-type': 'סוג גג',
-    'tiles-age': 'גיל גג רעפים', 'roof-size': 'שטח גג', 'roof-orientation': 'כיוון גג', 'shading': 'הצללות',
+    'tiles-age': 'גיל גג רעפים', 'material-sizes': 'שטחי גג', 'roof-orientation': 'כיוון גג', 'shading': 'הצללות',
   };
   return labels[id] || id;
 }
