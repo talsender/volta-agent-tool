@@ -3,6 +3,17 @@ const CONFIG = {
   ROOF_SIZE_GOOD: 70,
   ROOF_SIZE_BORDERLINE: 60,
   ROOF_AGE_WARNING: 25,
+
+  // הדבק כאן את ערכי ה-config מפרויקט ה-Firebase שלך.
+  // ניהול בקשות החריגה והנציגים נשמר ב-Firestore.
+  FIREBASE_CONFIG: {
+    apiKey: 'REPLACE_ME',
+    authDomain: 'REPLACE_ME.firebaseapp.com',
+    projectId: 'REPLACE_ME',
+    storageBucket: 'REPLACE_ME.appspot.com',
+    messagingSenderId: 'REPLACE_ME',
+    appId: 'REPLACE_ME',
+  },
 };
 
 // Single source of truth for roof eligibility. Manager-editable in a later
