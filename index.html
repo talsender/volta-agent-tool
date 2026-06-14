@@ -3,39 +3,114 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Volta Solar — כלי נציגים</title>
+  <title>VOLTA · Orbital Solar Deployment Grid</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- ===== ATMOSPHERE LAYERS ===== -->
+  <div class="space-bg" aria-hidden="true"></div>
+  <canvas id="starfield" class="starfield" aria-hidden="true"></canvas>
+  <div class="hud-grid" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
   <div id="app">
+    <!-- ===== TOP TELEMETRY BAR ===== -->
     <header class="app-header">
-      <div class="logo">Volta <span>Solar</span></div>
-      <div class="subtitle">כלי נציגים — בדיקת יישובים וכשירות גג</div>
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <span class="brand-ring"></span>
+          <span class="brand-core"></span>
+        </div>
+        <div class="brand-text">
+          <div class="logo">VOLTA <span>SOLAR</span></div>
+          <div class="subtitle">כלי נציגים · בדיקת יישובים וכשירות גג</div>
+        </div>
+      </div>
+      <div class="telemetry">
+        <div class="tele-item"><span class="led led-green"></span><span class="tele-k">SAT-LINK</span><span class="tele-v">ONLINE</span></div>
+        <div class="tele-item"><span class="tele-k">UTC</span><span class="tele-v" id="sys-time">--:--:--</span></div>
+        <div class="tele-item tele-coord"><span class="tele-k">GRID</span><span class="tele-v" id="sys-coord">31.0°N · 34.8°E</span></div>
+      </div>
     </header>
 
-    <nav class="tabs">
-      <button class="tab active" data-tab="settlement">📍 בדיקת יישוב</button>
-      <button class="tab" data-tab="wizard">🏠 כשירות גג</button>
-    </nav>
+    <div class="console-layout">
+      <!-- ===== GLOBE / RECON PANEL ===== -->
+      <aside class="globe-panel">
+        <div class="panel-tag">RECON ARRAY</div>
+        <div class="globe-stage">
+          <span class="corner tl"></span><span class="corner tr"></span>
+          <span class="corner bl"></span><span class="corner br"></span>
+          <canvas id="globe" class="globe-canvas"></canvas>
+          <div id="target-hud" class="target-hud" aria-hidden="true">
+            <span class="th-state">TARGET</span>
+            <span class="th-name" id="th-name">—</span>
+          </div>
+          <div class="globe-caption" id="globe-caption">GROUND-STATION SCAN · ISR SECTOR</div>
+        </div>
+        <div class="readouts">
+          <div class="readout"><span class="r-k">ORBIT</span><span class="r-v" id="r-orbit">LEO-SYNC</span></div>
+          <div class="readout"><span class="r-k">NODES</span><span class="r-v" id="r-nodes">1,247</span></div>
+          <div class="readout"><span class="r-k">SIGNAL</span>
+            <span class="r-bars"><i></i><i></i><i></i><i></i><i></i></span>
+          </div>
+          <div class="readout"><span class="r-k">FLUX</span><span class="r-v amber" id="r-flux">1361 W/m²</span></div>
+        </div>
+      </aside>
 
-    <!-- Tab 1: Settlement Check -->
-    <section id="tab-settlement" class="tab-content active">
-      <div class="search-label">הקלד שם יישוב של הלקוח:</div>
-      <div class="search-box">
-        <input id="settlement-input" class="search-input" type="text"
-          placeholder="לדוגמה: רמת השרון, מגדל העמק..." autocomplete="off">
-      </div>
-      <div id="suggestions" class="suggestions hidden"></div>
-      <div id="settlement-result" class="result-area"></div>
-      <div id="data-status" class="data-status"></div>
-    </section>
+      <!-- ===== MAIN CONSOLE ===== -->
+      <main class="console-panel">
+        <nav class="tabs">
+          <button class="tab active" data-tab="settlement"><span class="tab-code">01</span>📍 בדיקת יישוב</button>
+          <button class="tab" data-tab="wizard"><span class="tab-code">02</span>🏠 כשירות גג</button>
+        </nav>
 
-    <!-- Tab 2: Qualification Wizard -->
-    <section id="tab-wizard" class="tab-content hidden">
-      <div id="wizard-container"></div>
-    </section>
+        <!-- Tab 1: Settlement Check -->
+        <section id="tab-settlement" class="tab-content active">
+          <div class="module-head">
+            <span class="module-id">MODULE&nbsp;01</span>
+            <span class="module-name">SETTLEMENT&nbsp;SCAN</span>
+            <span class="module-stat"><span class="led led-cyan"></span>READY</span>
+          </div>
+          <div class="search-label">הקלד שם יישוב של הלקוח לסריקת קואורדינטות:</div>
+          <div class="search-box">
+            <span class="search-prefix" aria-hidden="true">&gt;_</span>
+            <input id="settlement-input" class="search-input" type="text"
+              placeholder="לדוגמה: רמת השרון, מגדל העמק..." autocomplete="off">
+            <span class="search-scan" aria-hidden="true"></span>
+          </div>
+          <div id="suggestions" class="suggestions hidden"></div>
+          <div id="settlement-result" class="result-area"></div>
+          <div id="data-status" class="data-status"></div>
+        </section>
+
+        <!-- Tab 2: Qualification Wizard -->
+        <section id="tab-wizard" class="tab-content hidden">
+          <div class="module-head">
+            <span class="module-id">MODULE&nbsp;02</span>
+            <span class="module-name">ROOF&nbsp;QUALIFICATION</span>
+            <span class="module-stat"><span class="led led-amber"></span>DIAGNOSTIC</span>
+          </div>
+          <div id="wizard-container"></div>
+        </section>
+      </main>
+    </div>
+
+    <!-- ===== STATUS FOOTER ===== -->
+    <footer class="hud-footer">
+      <span class="foot-item"><span class="led led-green"></span>SYSTEM NOMINAL</span>
+      <span class="foot-sep">//</span>
+      <span class="foot-item">VOLTA ORBITAL DEPLOYMENT GRID v2.6</span>
+      <span class="foot-sep">//</span>
+      <span class="foot-item foot-mono" id="foot-seq">SEQ 0x0000</span>
+    </footer>
   </div>
 
+  <script src="globe.js"></script>
   <script src="config.js"></script>
   <script src="settlements.js"></script>
   <script src="wizard.js"></script>

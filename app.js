@@ -49,6 +49,7 @@ function renderSuggestions(results) {
 function renderSettlementResult(settlement) {
   const r = Settlements.getResult(settlement);
   document.getElementById('suggestions').classList.add('hidden');
+  if (window.VoltaGlobe) window.VoltaGlobe.lockTarget(settlement.name, r.cls);
   let installBadge = '';
   if (r.installCount > 0) {
     const lastTxt = r.lastInstall ? ` · אחרונה: ${escHtml(r.lastInstall)}` : '';
@@ -82,6 +83,7 @@ function initSettlementTab() {
   input.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     document.getElementById('settlement-result').innerHTML = '';
+    if (window.VoltaGlobe) window.VoltaGlobe.release();
     debounceTimer = setTimeout(() => {
       const results = Settlements.search(input.value);
       renderSuggestions(results);
@@ -105,6 +107,9 @@ function renderWizard() {
 
   if (s.outcome) {
     container.innerHTML = renderWizardResult();
+    if (window.VoltaGlobe && (s.outcome === 'go' || s.outcome === 'go-notes')) {
+      window.VoltaGlobe.deploy();
+    }
     return;
   }
 
