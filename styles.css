@@ -776,3 +776,87 @@ input[type=range]::-webkit-slider-thumb {
 .msize-verdict.ok   { background: rgba(61,240,138,0.1); color: var(--green); border-color: rgba(61,240,138,0.35); }
 .msize-verdict.warn { background: rgba(255,178,74,0.1); color: var(--amber-br); border-color: rgba(255,178,74,0.35); }
 .msize-verdict.bad  { background: rgba(255,93,108,0.1); color: var(--red); border-color: rgba(255,93,108,0.35); }
+
+/* ===================== EXCEPTION REQUESTS + AGENT AUTH ===================== */
+
+/* Shared button modifiers */
+.btn.ghost { background: rgba(8,14,28,0.6); color: var(--amber-br); border-color: rgba(255,178,74,0.35); }
+.btn.ghost:hover { border-color: var(--amber); }
+.btn.sm { padding: 6px 11px; font-size: 12px; }
+
+/* Agent login gate */
+.login-gate { position: fixed; inset: 0; z-index: 1000; display: flex;
+  align-items: center; justify-content: center; background: rgba(3,5,12,0.92); }
+.login-gate.hidden { display: none; }
+.login-card { background: var(--panel-2); border: 1px solid var(--line-strong);
+  border-radius: 14px; padding: 32px; width: min(360px, 90vw); text-align: center;
+  box-shadow: 0 0 40px rgba(54,230,212,0.12); }
+.login-title { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+.login-sub { font-size: 13px; color: var(--text-dim); margin-bottom: 18px; }
+.login-input { width: 100%; padding: 12px; border-radius: 9px; border: 1px solid var(--line-strong);
+  background: var(--void); color: var(--text); font-size: 16px; text-align: center;
+  margin-bottom: 12px; font-family: var(--sans); }
+.login-input.sm { font-size: 13px; padding: 8px 10px; margin: 0; width: auto; flex: 1; min-width: 90px; }
+.login-btn { width: 100%; padding: 12px; border: none; border-radius: 9px; cursor: pointer;
+  background: linear-gradient(180deg, var(--cyan-br), var(--cyan)); color: #02181a;
+  font-size: 15px; font-weight: 700; box-shadow: 0 0 18px rgba(54,230,212,0.35); }
+.login-error, .req-error { color: var(--red); font-size: 13px; min-height: 18px; margin-top: 8px; }
+#app.gated { filter: blur(3px); pointer-events: none; user-select: none; }
+
+/* Agent bar in header */
+.agent-bar { display: flex; align-items: center; gap: 10px; margin-inline-start: auto; }
+.agent-name { color: var(--text); font-size: 13px; font-weight: 600; }
+.agent-link { background: none; border: 1px solid var(--line); color: var(--text-dim);
+  cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 8px; font-family: var(--sans); }
+.agent-link:hover { border-color: var(--line-strong); color: var(--text); }
+
+/* Modals (request / my-requests / admin) */
+.req-modal { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center;
+  justify-content: center; background: rgba(3,5,12,0.8); padding: 16px; }
+.req-modal.hidden { display: none; }
+.req-card { background: var(--panel-2); border: 1px solid var(--line-strong); border-radius: 14px;
+  padding: 24px; width: min(440px, 92vw); box-shadow: 0 0 40px rgba(54,230,212,0.12); }
+.req-card.wide { width: min(680px, 94vw); max-height: 84vh; overflow: auto; }
+.req-title { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 14px; }
+.req-context { font-size: 13px; color: var(--text-dim); background: var(--void); border-radius: 9px;
+  padding: 10px; margin-bottom: 12px; border: 1px solid var(--line); }
+.req-reason { width: 100%; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--void);
+  color: var(--text); padding: 10px; font-size: 14px; resize: vertical; font-family: var(--sans); box-sizing: border-box; }
+.req-actions { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-start; flex-wrap: wrap; }
+
+/* My requests */
+.my-req-list { display: flex; flex-direction: column; gap: 10px; }
+.my-req-empty { color: var(--muted); font-size: 13px; padding: 16px; text-align: center; }
+.my-req-row { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--void); }
+.my-req-row.approved { border-color: rgba(61,240,138,0.45); }
+.my-req-row.rejected { border-color: rgba(255,93,108,0.45); }
+.mr-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+.mr-subject { color: var(--text); font-size: 14px; }
+.mr-reason { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+.mr-note { color: var(--text); font-size: 13px; margin-top: 6px; background: var(--panel); border-radius: 7px; padding: 6px 8px; }
+
+/* Admin panel */
+.admin-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.admin-tab { background: none; border: 1px solid var(--line); color: var(--text-dim); cursor: pointer;
+  padding: 7px 14px; border-radius: 9px; font-size: 13px; font-family: var(--sans); }
+.admin-tab.active { background: var(--glass); color: var(--text); border-color: var(--line-strong); }
+.admin-pane.hidden { display: none; }
+.admin-filter { display: flex; gap: 8px; margin-bottom: 12px; }
+.chip { background: none; border: 1px solid var(--line); color: var(--text-dim); cursor: pointer;
+  padding: 4px 12px; border-radius: 14px; font-size: 12px; font-family: var(--sans); }
+.chip.on { background: linear-gradient(180deg, var(--cyan-br), var(--cyan)); color: #02181a; border-color: transparent; }
+.admin-req-row { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--void); margin-bottom: 10px; }
+.ar-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-dim); }
+.ar-agent { font-weight: 600; color: var(--text); }
+.ar-subject { color: var(--text); font-size: 14px; margin: 6px 0; }
+.ar-reason { color: var(--text-dim); font-size: 13px; }
+.req-row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.req-row-status { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.agent-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.agent-list { display: flex; flex-direction: column; gap: 8px; }
+.agent-row { display: flex; gap: 12px; align-items: center; border: 1px solid var(--line);
+  border-radius: 9px; padding: 8px 12px; background: var(--void); flex-wrap: wrap; }
+.agent-row.inactive { opacity: 0.55; }
+.ag-name { color: var(--text); font-weight: 600; }
+.ag-code { color: var(--text-dim); font-size: 12px; }
+.ag-state { color: var(--muted); font-size: 12px; margin-inline-start: auto; }
