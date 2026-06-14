@@ -44,12 +44,17 @@ const Settlements = (() => {
     }).filter(s => s.name);
   }
 
-  // Load from embedded data (settlements-data.js) — no external fetch.
+  // Load from embedded data (settlements-data.js), then merge Firestore
+  // manager overrides on top (if the data layer is connected).
   async function load() {
     try {
       const text = window.SETTLEMENTS_CSV;
       if (!text) throw new Error('embedded data (SETTLEMENTS_CSV) missing');
       _data = parseCSV(text);
+      if (typeof VoltaDB !== 'undefined' && VoltaDB.ready() && typeof Requests !== 'undefined') {
+        const overrides = await VoltaDB.loadOverrides();
+        _data = Requests.mergeOverrides(_data, overrides);
+      }
       return { ok: true, count: _data.length };
     } catch (err) {
       _data = [];

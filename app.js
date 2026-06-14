@@ -26,6 +26,7 @@ function initTabs() {
 // SETTLEMENT TAB
 // ============================================================
 let _suggestionCache = [];
+let _currentSettlement = null;
 
 function renderSuggestions(results) {
   const el = document.getElementById('suggestions');
@@ -48,6 +49,7 @@ function renderSuggestions(results) {
 
 function renderSettlementResult(settlement) {
   const r = Settlements.getResult(settlement);
+  _currentSettlement = settlement;
   document.getElementById('suggestions').classList.add('hidden');
   if (window.VoltaGlobe) window.VoltaGlobe.lockTarget(settlement.name, r.cls);
   let installBadge = '';
@@ -64,6 +66,7 @@ function renderSettlementResult(settlement) {
         ${installBadge}
         ${r.note ? `<div class="result-note">${escHtml(r.note)}</div>` : ''}
         ${r.showWizardBtn ? `<button class="result-action-btn" onclick="switchToWizard()">המשך לבדיקת כשירות גג ←</button>` : ''}
+        <button class="result-action-btn ghost" onclick="openSettlementRequest()">🚩 בקש חריגה ממנהל</button>
       </div>
     </div>`;
 }
@@ -425,6 +428,7 @@ function renderWizardResult() {
       <div class="btn-row">
         <button class="btn secondary">📅 קבע פולואפ לתאריך</button>
         <button class="btn vsd">↗ העבר ל-VSD</button>
+        <button class="btn ghost" onclick="openRoofRequest()">🚩 בקש חריגה ממנהל</button>
         <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
       </div>
     </div>`;
@@ -437,6 +441,7 @@ function renderWizardResult() {
       <div class="action-box"><div class="action-title">סיבה</div>
         <div class="action-text">${s.escalateNote || ''}</div></div>
       <div class="btn-row">
+        <button class="btn ghost" onclick="openRoofRequest()">🚩 בקש חריגה ממנהל</button>
         <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
       </div>
     </div>`;
@@ -452,6 +457,7 @@ function renderWizardResult() {
     </div>
     ${s.stopScript ? `<div class="flag-box"><span class="flag-icon">💬</span><span>נוסח לנציג: <em>"${s.stopScript}"</em></span></div>` : ''}
     <div class="btn-row">
+      <button class="btn ghost" onclick="openRoofRequest()">🚩 בקש חריגה ממנהל</button>
       <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
     </div>
   </div>`;
@@ -463,11 +469,159 @@ function initWizard() {
 }
 
 // ============================================================
+// AGENT LOGIN / GATING
+// ============================================================
+let _agents = [];
+
+function showLoginGate() {
+  document.getElementById('login-gate').classList.remove('hidden');
+  document.getElementById('app').classList.add('gated');
+}
+function hideLoginGate() {
+  document.getElementById('login-gate').classList.add('hidden');
+  document.getElementById('app').classList.remove('gated');
+}
+function renderAgentBar() {
+  const agent = Auth.getCurrentAgent();
+  document.getElementById('agent-name').textContent = agent ? '👤 ' + agent.name : '—';
+}
+function attemptLogin() {
+  const code = document.getElementById('login-code').value;
+  const agent = Auth.findAgentByCode(_agents, code);
+  const errEl = document.getElementById('login-error');
+  if (!agent) { errEl.textContent = 'קוד שגוי או נציג לא פעיל'; return; }
+  Auth.setCurrentAgent(agent);
+  errEl.textContent = '';
+  document.getElementById('login-code').value = '';
+  hideLoginGate();
+  renderAgentBar();
+}
+function initAgentAuth() {
+  document.getElementById('login-btn').addEventListener('click', attemptLogin);
+  document.getElementById('login-code').addEventListener('keydown', e => {
+    if (e.key === 'Enter') attemptLogin();
+  });
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    Auth.logout();
+    renderAgentBar();
+    showLoginGate();
+  });
+  // Live agents list — used to validate login codes.
+  VoltaDB.subscribeAgents(list => { _agents = list; });
+  if (Auth.getCurrentAgent()) { hideLoginGate(); renderAgentBar(); }
+  else { showLoginGate(); }
+}
+
+// ============================================================
+// EXCEPTION REQUEST MODAL
+// ============================================================
+let _pendingReq = null;
+
+function openRequestModal(type, subject, context) {
+  _pendingReq = { type, subject, context };
+  document.getElementById('req-context').textContent =
+    (type === 'settlement' ? 'יישוב: ' : 'בדיקת גג: ') + subject;
+  document.getElementById('req-reason').value = '';
+  document.getElementById('req-error').textContent = '';
+  document.getElementById('req-modal').classList.remove('hidden');
+}
+function openSettlementRequest() {
+  if (!_currentSettlement) return;
+  // subject is the bare name so the override key matches the settlement lookup.
+  openRequestModal('settlement', _currentSettlement.name, { status: _currentSettlement.status });
+}
+function wizardRoofSubject() {
+  const s = Wizard.getState();
+  const parts = s.answers.map(a => labelForId(a.questionId) + ': ' + a.label);
+  return (s.outcome ? '[' + s.outcome + '] ' : '') + parts.join(' · ');
+}
+function openRoofRequest() {
+  const s = Wizard.getState();
+  openRequestModal('roof', wizardRoofSubject(), {
+    outcome: s.outcome,
+    answers: s.answers.map(a => ({ q: labelForId(a.questionId), a: a.label })),
+  });
+}
+function closeRequestModal() {
+  document.getElementById('req-modal').classList.add('hidden');
+  _pendingReq = null;
+}
+async function sendRequest() {
+  const reason = document.getElementById('req-reason').value;
+  const errEl = document.getElementById('req-error');
+  const agent = Auth.getCurrentAgent();
+  if (!agent) { errEl.textContent = 'לא מחובר נציג'; return; }
+  if (!VoltaDB.ready()) { errEl.textContent = 'אין חיבור לשרת — נסה שוב'; return; }
+  try {
+    const req = Requests.buildRequest({
+      type: _pendingReq.type, agent, subject: _pendingReq.subject,
+      reason, context: _pendingReq.context,
+    });
+    await VoltaDB.addRequest(req);
+    closeRequestModal();
+    alert('הבקשה נשלחה למנהל ✓');
+  } catch (e) {
+    errEl.textContent = (e && e.message === 'reason required') ? 'יש לכתוב נימוק' : 'שגיאה בשליחה';
+  }
+}
+function initRequestModal() {
+  document.getElementById('req-send').addEventListener('click', sendRequest);
+  document.getElementById('req-cancel').addEventListener('click', closeRequestModal);
+}
+
+// ============================================================
+// MY REQUESTS
+// ============================================================
+let _myRequests = [];
+const STATUS_LABEL = { pending: '⏳ ממתין', approved: '✅ אושר', rejected: '❌ נדחה' };
+const RES_LABEL = { 'one-off': 'חד-פעמי', 'permanent': 'קבוע' };
+
+function renderMyRequests() {
+  const agent = Auth.getCurrentAgent();
+  const mine = agent ? _myRequests.filter(r => r.agentId === agent.id) : [];
+  mine.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const el = document.getElementById('my-req-list');
+  if (!mine.length) { el.innerHTML = '<div class="my-req-empty">אין בקשות עדיין.</div>'; return; }
+  el.innerHTML = mine.map(r => {
+    const res = r.resolution ? ` · ${RES_LABEL[r.resolution] || ''}` : '';
+    const note = r.managerNote ? `<div class="mr-note">💬 ${escHtml(r.managerNote)}</div>` : '';
+    return `<div class="my-req-row ${r.status}">
+      <div class="mr-head"><span class="mr-type">${r.type === 'roof' ? '🏠 גג' : '📍 יישוב'}</span>
+        <span class="mr-status">${STATUS_LABEL[r.status] || r.status}${res}</span></div>
+      <div class="mr-subject">${escHtml(r.subject || '')}</div>
+      <div class="mr-reason">${escHtml(r.reason || '')}</div>
+      ${note}
+    </div>`;
+  }).join('');
+}
+function initMyRequests() {
+  document.getElementById('my-requests-btn').addEventListener('click', () => {
+    renderMyRequests();
+    document.getElementById('my-req-modal').classList.remove('hidden');
+  });
+  document.getElementById('my-req-close').addEventListener('click', () => {
+    document.getElementById('my-req-modal').classList.add('hidden');
+  });
+  VoltaDB.subscribeRequests(list => {
+    _myRequests = list;
+    if (!document.getElementById('my-req-modal').classList.contains('hidden')) renderMyRequests();
+  });
+}
+
+// ============================================================
 // INIT
 // ============================================================
 async function init() {
   initTabs();
   initSettlementTab();
+  initRequestModal();
+
+  // Firebase loads via a deferred module script that runs before DOMContentLoaded,
+  // so window.firebase is available here.
+  if (window.firebase) VoltaDB.init();
+  initAgentAuth();
+  initMyRequests();
+  if (typeof initManagerPanel === 'function') initManagerPanel();
 
   const statusEl = document.getElementById('data-status');
   statusEl.textContent = 'טוען נתוני יישובים...';
@@ -476,7 +630,7 @@ async function init() {
     statusEl.textContent = `✓ ${result.count} יישובים נטענו`;
     setTimeout(() => { statusEl.textContent = ''; }, 3000);
   } else {
-    statusEl.textContent = `⚠️ לא ניתן לטעון נתונים — בדוק חיבור אינטרנט`;
+    statusEl.textContent = `⚠️ לא ניתן לטעון נתונים`;
   }
 
   if (typeof initWizard === 'function') initWizard();
