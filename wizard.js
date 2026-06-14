@@ -75,6 +75,27 @@ const Wizard = (() => {
     selectedRoofTypes: [],
   };
 
+  // roofConfig is the single source of truth for materials/thresholds.
+  // Falls back to safe defaults if config.js failed to define it.
+  const roofConfig = (typeof DEFAULT_ROOF_CONFIG !== 'undefined')
+    ? DEFAULT_ROOF_CONFIG
+    : { materials: [], totalSizeThresholds: { good: 70, borderline: 60 }, tilesAgeWarning: 25 };
+
+  // Build roof-type multi-select options from the materials list. Message
+  // fields are flattened to the top level for the existing confirm flow.
+  function roofTypeOptions() {
+    return roofConfig.materials.map(m => ({
+      label: `${m.emoji} ${m.label}`,
+      value: m.id,
+      flagClass: m.baseFlagClass,
+      action: m.baseAction, // null|'flag'|'escalate'|'stop'|'tiles-age'
+      flagMsg: m.messages.flagMsg,
+      escalateNote: m.messages.escalateNote,
+      stopReason: m.messages.stopReason,
+      stopScript: m.messages.stopScript,
+    }));
+  }
+
   const QUESTIONS = [
     {
       id: 'property-type',
@@ -149,21 +170,7 @@ const Wizard = (() => {
       text: 'מה סוג/י הגג?',
       hint: 'אפשר לבחור כמה חלקים — לדוגמה פרגולה + בטון שטוח',
       type: 'roof-grid-multi',
-      options: [
-        { label: '🟫 בטון שטוח',         value: 'concrete',   flagClass: 'ok',   action: null },
-        { label: '🔺 רעפים',              value: 'tiles',      flagClass: 'ok',   action: 'tiles-age' },
-        { label: '☀️ פרגולה סולארית',    value: 'pergola',    flagClass: 'ok',
-          action: 'flag', flagMsg: 'פרגולה סולארית — פאנלים מיוחדים, המומחה יאשר את הסוג' },
-        { label: '🔧 פאנל מבודד',         value: 'insulated',  flagClass: 'warn',
-          action: 'escalate',
-          escalateNote: 'פאנל מבודד — נדרש אישור מנהל. יש מקרים שהושלמו בהצלחה.' },
-        { label: '🏗 איסכורית',           value: 'corrugated', flagClass: 'warn',
-          action: 'flag', flagMsg: 'איסכורית — נדרש אישור קונסטרוקטור לחוזק הגג. המומחה יבדוק.' },
-        { label: '❌ בנייה קלה / מייטק',  value: 'light',      flagClass: 'bad',
-          action: 'stop',
-          stopReason: 'בנייה קלה / מייטק — לא מתאים להתקנה',
-          stopScript: 'לצערנו לא מתקינים על גגות בנייה קלה או מייטק. תודה על הפנייה!' },
-      ],
+      get options() { return roofTypeOptions(); },
     },
     {
       id: 'tiles-age',
