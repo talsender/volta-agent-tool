@@ -137,6 +137,10 @@ const Admin = (() => {
   function init() {
     const logo = document.querySelector('.brand');
     if (logo) logo.addEventListener('dblclick', promptLogin);
+    // Reachable from the login gate too, so a manager can bootstrap agents
+    // before anyone is able to log in.
+    const mgrBtn = document.getElementById('manager-access');
+    if (mgrBtn) mgrBtn.addEventListener('click', promptLogin);
     document.getElementById('admin-close').addEventListener('click', close);
     document.querySelectorAll('.admin-tab').forEach(t =>
       t.addEventListener('click', () => switchTab(t.dataset.atab)));
