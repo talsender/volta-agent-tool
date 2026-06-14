@@ -147,10 +147,6 @@ function renderWizard() {
   </div>`;
 
   container.innerHTML = html;
-  if (q && q.type === 'size-input') {
-    const slider = document.getElementById('size-slider');
-    if (slider) setTimeout(() => updateSizeDisplay(slider.value), 0);
-  }
   if (q && q.type === 'compass') {
     setTimeout(() => initRoofCompass(180), 0);
   }
@@ -305,22 +301,6 @@ function renderQuestionInput(q) {
         <button class="btn primary" onclick="wizardOrientationConfirm()">אשר כיוון גג ←</button>
       </div>`;
   }
-  if (q.type === 'size-input') {
-    return `
-      <div class="size-display" id="size-display">80</div>
-      <div class="size-unit">מ"ר</div>
-      <input type="range" class="size-slider" id="size-slider" min="0" max="250" value="80"
-        oninput="updateSizeDisplay(this.value)">
-      <div class="size-zones">
-        <span style="color:#e63946">0–60<br>❌</span>
-        <span style="color:#e07800">60–70<br>⚠️</span>
-        <span style="color:#2d6a4f">70+<br>✅</span>
-      </div>
-      <div class="size-verdict ok" id="size-verdict"></div>
-      <div class="btn-row" style="margin-top:14px">
-        <button class="btn primary" onclick="wizardSizeConfirm()">אשר שטח גג</button>
-      </div>`;
-  }
   if (q.type === 'material-sizes') {
     const mats = Wizard.selectedMaterials();
     const rows = mats.map((m, i) => `
@@ -342,32 +322,10 @@ function renderQuestionInput(q) {
   return '';
 }
 
-function updateSizeDisplay(val) {
-  const v = parseInt(val);
-  document.getElementById('size-display').textContent = v;
-  const verd = document.getElementById('size-verdict');
-  if (v >= CONFIG.ROOF_SIZE_GOOD) {
-    verd.className = 'size-verdict ok';
-    verd.textContent = `✅ ${v} מ"ר — גג מתאים לשיחת מומחה`;
-  } else if (v >= CONFIG.ROOF_SIZE_BORDERLINE) {
-    verd.className = 'size-verdict warn';
-    verd.textContent = `⚠️ ${v} מ"ר — גבולי, המומחה יאשר`;
-  } else {
-    verd.className = 'size-verdict bad';
-    verd.textContent = `❌ ${v} מ"ר — קטן מדי (מינימום 60 מ"ר)`;
-  }
-}
-
 function wizardAnswer(optionIndex) {
   const q = Wizard.currentQuestion();
   const opt = q.options[optionIndex];
   Wizard.answer(opt);
-  renderWizard();
-}
-
-function wizardSizeConfirm() {
-  const val = document.getElementById('size-slider').value;
-  Wizard.answer({}, val);
   renderWizard();
 }
 
