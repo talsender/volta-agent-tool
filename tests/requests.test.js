@@ -56,3 +56,37 @@ test('buildRequest זורק על type לא חוקי', () => {
     type: 'bogus', agent: { id: 'a1' }, reason: 'x',
   }), /type/);
 });
+
+test('decideRequest דחייה מסמנת rejected עם הערה', () => {
+  const patch = Requests.decideRequest({ type: 'settlement' },
+    { action: 'reject', managerNote: 'לא רלוונטי' });
+  assert.strictEqual(patch.status, 'rejected');
+  assert.strictEqual(patch.resolution, null);
+  assert.strictEqual(patch.managerNote, 'לא רלוונטי');
+  assert.strictEqual(typeof patch.resolvedAt, 'number');
+});
+
+test('decideRequest אישור חד-פעמי', () => {
+  const patch = Requests.decideRequest({ type: 'roof' },
+    { action: 'approve', resolution: 'one-off', managerNote: 'אושר ללקוח' });
+  assert.strictEqual(patch.status, 'approved');
+  assert.strictEqual(patch.resolution, 'one-off');
+});
+
+test('decideRequest אישור קבוע', () => {
+  const patch = Requests.decideRequest({ type: 'settlement' },
+    { action: 'approve', resolution: 'permanent' });
+  assert.strictEqual(patch.status, 'approved');
+  assert.strictEqual(patch.resolution, 'permanent');
+});
+
+test('overrideFromApproval בונה override ליישוב בלבד', () => {
+  const req = { type: 'settlement', subject: 'מגדל העמק', reason: 'לקוח גדול' };
+  const ov = Requests.overrideFromApproval(req, 'לא מתקינים', 'מנהל');
+  assert.strictEqual(ov.key, 'מגדל העמק');
+  assert.strictEqual(ov.value.status, 'לא מתקינים');
+  assert.strictEqual(ov.value.note, 'לקוח גדול');
+  assert.strictEqual(ov.value.updatedBy, 'מנהל');
+
+  assert.strictEqual(Requests.overrideFromApproval({ type: 'roof' }, 'x', 'm'), null);
+});

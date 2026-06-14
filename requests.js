@@ -43,7 +43,29 @@ const Requests = (() => {
     };
   }
 
-  return { normalizeName, mergeOverrides, buildRequest };
+  // decision: { action: 'approve'|'reject', resolution?: 'one-off'|'permanent', managerNote? }
+  function decideRequest(request, decision) {
+    const now = Date.now();
+    if (decision.action === 'reject') {
+      return { status: 'rejected', resolution: null, managerNote: decision.managerNote || '', resolvedAt: now };
+    }
+    if (decision.action === 'approve') {
+      const resolution = decision.resolution === 'permanent' ? 'permanent' : 'one-off';
+      return { status: 'approved', resolution, managerNote: decision.managerNote || '', resolvedAt: now };
+    }
+    throw new Error('invalid action');
+  }
+
+  // For permanent settlement approval, compute the override doc to write.
+  function overrideFromApproval(request, newStatus, managerName) {
+    if (request.type !== 'settlement') return null;
+    return {
+      key: normalizeName(request.subject),
+      value: { status: newStatus, note: request.reason, updatedBy: managerName || '', updatedAt: Date.now() },
+    };
+  }
+
+  return { normalizeName, mergeOverrides, buildRequest, decideRequest, overrideFromApproval };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Requests;
