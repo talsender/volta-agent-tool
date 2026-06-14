@@ -1,0 +1,76 @@
+=== לוג ניתוח CRM — וולטה סולאר ===
+תאריך ריצה: 2026-06-13 19:49
+קובץ מקור:  C:\Users\Sinaymer\Desktop\City volta solar\Residential - Last view used.xlsx
+קובץ פלט:   C:\Users\Sinaymer\Desktop\City volta solar\crm_knowledge_analysis_output.xlsx
+
+--- נתונים כלליים ---
+סה"כ שורות בקובץ:      20,000
+שורות ללא יישוב:       1,133
+שורות שעובדו:          20,000
+
+--- עמודות שזוהו ---
+  col[  4] = Solar_Expert
+  col[ 10] = Status
+  col[ 20] = City
+  col[ 21] = Regional_Council
+  col[ 26] = Site_Description
+  col[ 28] = Pre_Meeting_Remarks
+  col[ 29] = Building_Type
+  col[ 33] = Roof_Size
+  col[ 35] = Roof_Type
+  col[ 37] = False_SE_Call
+  col[ 38] = False_SE_Call_Reasons
+  col[ 39] = Irrelevant_Before
+  col[ 41] = Date_Expert_Call
+  col[ 42] = Date_Frontal_Meeting
+  col[ 43] = Date_Video_Meeting
+  col[ 44] = Date_Phone_Meeting
+  col[ 60] = Lead_Source
+  col[ 78] = Meeting_Summary
+  col[ 84] = Irrelevant_After
+  col[ 87] = Losing_Reason
+  col[130] = CSL_Remarks
+  col[137] = Installation_Notes
+  col[193] = Electrical_Infra
+  col[251] = Cancellation_Reason
+  col[299] = Podio_ID
+  col[302] = Internal_ID
+
+--- החלטות ---
+מתקינים:               4,062
+לא מתקינים:            2,949
+להתיייעץ:              11,856
+לא זוהה:               1,133
+עברו למומחה:            19,170
+פרויקטים שהושלמו:      2,115
+יישובים ערביים:        435
+דרומי למצפה רמון:      251
+
+--- עדכונים מוצעים ---
+יישובים לעדכון:        522
+סוגי תשתית שנמצאו:    11
+שאלות פתוחות:          13,441
+
+--- יישובים נפוצים (10 ראשונים) ---
+  Be'er Sheva: 611
+  Hadera: 287
+  Rishon LeTsiyon: 215
+  Eilat: 210
+  Jerusalem: 206
+  Ashkelon: 202
+  Modi'in-Maccabim-Re'ut: 194
+  Pardes Hanna-Karkur: 179
+  Caesarea: 177
+  Kiryat Tiv'on: 177
+
+--- סיבות פסילה נפוצות (10 ראשונות) ---
+  אחר - מפורט בהערות: 4241
+  גג לא מתאים להתקנה: 1560
+  לא מעוניין - כלכלית: 1378
+  מנותק קשר: 1144
+  התקדם עם חברה אחרת: 1097
+  אין היתרים / טופס 4 - לא ישתנה: 437
+  לקוח לא פירט: 293
+  תקבולים נמוכים - ליסינג: 147
+  מחיר: 82
+  לא מעוניין - אסתטיקה: 67
