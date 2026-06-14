@@ -1,3 +1,63 @@
+// Pure qualification logic — severity order: stop > escalate > warn > ok.
+// selections: [{ materialId, size }]; roofConfig: see DEFAULT_ROOF_CONFIG.
+function evaluateRoof(selections, roofConfig) {
+  const SEV = { stop: 3, escalate: 2, warn: 1, ok: 0 };
+  const result = {
+    outcome: 'ok', flags: [], stopReason: '', stopScript: '',
+    escalateNote: '', perMaterial: [],
+  };
+  let worst = 'ok';
+  const bump = (outcome, msg, reasons) => {
+    if (SEV[outcome] > SEV[worst]) worst = outcome;
+    if (outcome === 'warn' && msg) result.flags.push(msg);
+    if (outcome === 'stop' && reasons) {
+      result.stopReason = reasons.stopReason || result.stopReason;
+      result.stopScript = reasons.stopScript || result.stopScript;
+    }
+    if (outcome === 'escalate' && reasons && reasons.escalateNote) {
+      result.escalateNote = reasons.escalateNote;
+    }
+  };
+
+  // 1) total-size rule (sum of all material areas)
+  const sum = selections.reduce((a, s) => a + (parseInt(s.size) || 0), 0);
+  const th = roofConfig.totalSizeThresholds;
+  if (sum < th.borderline) {
+    bump('stop', null, {
+      stopReason: `שטח גג כולל ${sum} מ"ר — קטן מדי להתקנה (מינימום ${th.borderline} מ"ר)`,
+      stopScript: `לצערנו שטח הגג לא מספיק גדול להתקנה. נדרש לפחות ${th.borderline} מ"ר.`,
+    });
+  } else if (sum < th.good) {
+    bump('warn', `שטח גג כולל ${sum} מ"ר — גבולי. המומחה יאשר התאמה`);
+  }
+
+  // 2) per-material base action + size rules
+  for (const sel of selections) {
+    const mat = roofConfig.materials.find(m => m.id === sel.materialId);
+    if (!mat) continue;
+    const size = parseInt(sel.size) || 0;
+    let matOutcome = 'ok';
+    let matMsg = '';
+
+    // base action (size-independent). 'tiles-age' is a flow trigger, not a severity.
+    if (mat.baseAction === 'stop') { bump('stop', null, mat.messages); matOutcome = 'stop'; }
+    else if (mat.baseAction === 'escalate') { bump('escalate', null, mat.messages); matOutcome = 'escalate'; }
+    else if (mat.baseAction === 'flag') { bump('warn', mat.messages.flagMsg); matOutcome = 'warn'; matMsg = mat.messages.flagMsg; }
+
+    // size rules (first rule whose upTo >= size; upTo:null = catch-all)
+    const rule = (mat.sizeRules || []).find(r => r.upTo === null || size <= r.upTo);
+    if (rule && rule.outcome !== 'ok') {
+      bump(rule.outcome, rule.message, { stopReason: rule.message, stopScript: '' });
+      if (SEV[rule.outcome] > SEV[matOutcome]) { matOutcome = rule.outcome; matMsg = rule.message; }
+    }
+
+    result.perMaterial.push({ id: mat.id, label: mat.label, size, outcome: matOutcome, message: matMsg });
+  }
+
+  result.outcome = worst;
+  return result;
+}
+
 // ============================================================
 // WIZARD STATE MACHINE
 // ============================================================
@@ -296,3 +356,7 @@ const Wizard = (() => {
 
   return { reset, currentQuestion, currentFlow, answer, getState, toggleRoofType, confirmRoofTypes };
 })();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Object.assign(module.exports || {}, { Wizard, evaluateRoof });
+}
