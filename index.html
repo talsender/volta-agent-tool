@@ -110,6 +110,28 @@
     </footer>
   </div>
 
+  <!-- ===== PERSISTENT COMPASS ROSE (bottom-left, always available) ===== -->
+  <div id="compass-dock" class="compass-dock">
+    <div class="dock-head">
+      <span class="dock-title"><span class="led led-cyan"></span>שושנת רוחות · כיוון גג</span>
+      <button class="dock-toggle" id="dock-toggle" onclick="toggleCompassDock()" title="כווץ / הרחב">▾</button>
+    </div>
+    <div class="dock-body" id="dock-body">
+      <canvas id="dock-compass" class="dock-canvas" width="200" height="200"></canvas>
+      <div class="dock-dirs">
+        <button class="dir-btn dock-dir-btn" data-deg="0"   onclick="dockCompassSet(0)">צ</button>
+        <button class="dir-btn dock-dir-btn" data-deg="45"  onclick="dockCompassSet(45)">צ-מז</button>
+        <button class="dir-btn dock-dir-btn" data-deg="90"  onclick="dockCompassSet(90)">מז</button>
+        <button class="dir-btn dock-dir-btn" data-deg="135" onclick="dockCompassSet(135)">ד-מז</button>
+        <button class="dir-btn dock-dir-btn" data-deg="180" onclick="dockCompassSet(180)">ד</button>
+        <button class="dir-btn dock-dir-btn" data-deg="225" onclick="dockCompassSet(225)">ד-מע</button>
+        <button class="dir-btn dock-dir-btn" data-deg="270" onclick="dockCompassSet(270)">מע</button>
+        <button class="dir-btn dock-dir-btn" data-deg="315" onclick="dockCompassSet(315)">צ-מע</button>
+      </div>
+      <div class="dock-verdict ok" id="dock-verdict">☀ דרום · תפוקה מיטבית</div>
+    </div>
+  </div>
+
   <script src="globe.js"></script>
   <script src="compass.js"></script>
   <script src="config.js"></script>

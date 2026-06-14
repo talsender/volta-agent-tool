@@ -203,6 +203,49 @@ function wizardOrientationConfirm() {
   renderWizard();
 }
 
+// ============================================================
+// PERSISTENT COMPASS DOCK (always-visible, independent instance)
+// ============================================================
+let _dockCompass = null;
+
+function initDockCompass() {
+  const canvas = document.getElementById('dock-compass');
+  if (!canvas || !window.RoofCompass) return;
+  _dockCompass = window.RoofCompass.mount(canvas, 180, updateDockReadout);
+  highlightDockDirBtn(180);
+}
+
+function dockCompassSet(deg) {
+  if (_dockCompass) _dockCompass.set(deg);
+  highlightDockDirBtn(deg);
+}
+
+function highlightDockDirBtn(deg) {
+  const d = ((Math.round(deg / 45) * 45) % 360 + 360) % 360;
+  document.querySelectorAll('.dock-dir-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.deg) === d);
+  });
+}
+
+function updateDockReadout(a) {
+  const v = document.getElementById('dock-verdict');
+  if (v) {
+    v.className = 'dock-verdict ' + (a.flagClass === 'ok' ? 'ok' : 'warn');
+    v.textContent = a.flag
+      ? a.flag
+      : '☀ ' + a.dir + ' · תפוקה ~' + a.yield + '% · ' + a.quality;
+  }
+  highlightDockDirBtn(a.az);
+}
+
+function toggleCompassDock() {
+  const dock = document.getElementById('compass-dock');
+  const btn = document.getElementById('dock-toggle');
+  if (!dock) return;
+  const collapsed = dock.classList.toggle('collapsed');
+  if (btn) btn.textContent = collapsed ? '▴' : '▾';
+}
+
 function labelForId(id) {
   const labels = {
     'property-type': 'סוג נכס', 'ownership': 'בעלות', 'permit': 'טופס 4',
@@ -427,6 +470,7 @@ async function init() {
   }
 
   if (typeof initWizard === 'function') initWizard();
+  initDockCompass();
 }
 
 document.addEventListener('DOMContentLoaded', init);
