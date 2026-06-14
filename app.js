@@ -154,6 +154,9 @@ function renderWizard() {
   if (q && q.type === 'compass') {
     setTimeout(() => initRoofCompass(180), 0);
   }
+  if (q && q.type === 'material-sizes') {
+    setTimeout(() => updateMaterialSizes(), 0);
+  }
 }
 
 // ============================================================
@@ -318,6 +321,24 @@ function renderQuestionInput(q) {
         <button class="btn primary" onclick="wizardSizeConfirm()">אשר שטח גג</button>
       </div>`;
   }
+  if (q.type === 'material-sizes') {
+    const mats = Wizard.selectedMaterials();
+    const rows = mats.map((m, i) => `
+      <div class="msize-row">
+        <span class="msize-label">${m.emoji} ${escHtml(m.label)}</span>
+        <input type="number" min="0" max="1000" value="40" inputmode="numeric"
+          class="msize-input" id="msize-${i}" data-id="${escHtml(m.id)}"
+          oninput="updateMaterialSizes()">
+        <span class="msize-unit">מ"ר</span>
+      </div>`).join('');
+    return `
+      <div class="msize-list">${rows}</div>
+      <div class="msize-total" id="msize-total">סה"כ: 0 מ"ר</div>
+      <div class="msize-verdict ok" id="msize-verdict"></div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn primary" onclick="materialSizesConfirm()">אשר שטחי גג ←</button>
+      </div>`;
+  }
   return '';
 }
 
@@ -347,6 +368,32 @@ function wizardAnswer(optionIndex) {
 function wizardSizeConfirm() {
   const val = document.getElementById('size-slider').value;
   Wizard.answer({}, val);
+  renderWizard();
+}
+
+// ---- Per-material sizes ----
+function readMaterialSizes() {
+  return Array.from(document.querySelectorAll('.msize-input')).map(el => ({
+    materialId: el.dataset.id,
+    size: parseInt(el.value) || 0,
+  }));
+}
+
+function updateMaterialSizes() {
+  const sizes = readMaterialSizes();
+  const sum = sizes.reduce((a, s) => a + s.size, 0);
+  const totalEl = document.getElementById('msize-total');
+  if (totalEl) totalEl.textContent = `סה"כ: ${sum} מ"ר`;
+  const v = document.getElementById('msize-verdict');
+  if (!v) return;
+  const good = CONFIG.ROOF_SIZE_GOOD, border = CONFIG.ROOF_SIZE_BORDERLINE;
+  if (sum >= good) { v.className = 'msize-verdict ok'; v.textContent = `✅ ${sum} מ"ר — שטח מתאים`; }
+  else if (sum >= border) { v.className = 'msize-verdict warn'; v.textContent = `⚠️ ${sum} מ"ר — גבולי, המומחה יאשר`; }
+  else { v.className = 'msize-verdict bad'; v.textContent = `❌ ${sum} מ"ר — קטן מדי (מינימום ${border} מ"ר)`; }
+}
+
+function materialSizesConfirm() {
+  Wizard.answerMaterialSizes(readMaterialSizes());
   renderWizard();
 }
 
