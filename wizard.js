@@ -126,6 +126,13 @@ const Wizard = (() => {
       options: [],
     },
     {
+      id: 'roof-orientation',
+      text: 'לאיזה כיוון פונה מדרון הגג העיקרי?',
+      hint: 'סובב את המחוג לכיוון שאליו משופע הגג. דרום = תפוקה מיטבית בישראל.',
+      type: 'compass',
+      options: [],
+    },
+    {
       id: 'shading',
       text: 'האם יש הצללות על הגג?',
       hint: 'עצים, מבנים שכנים, מיתקנים על הגג',
@@ -141,7 +148,7 @@ const Wizard = (() => {
     },
   ];
 
-  const MAIN_FLOW = ['property-type','ownership','permit','connection','meter','roof-type','roof-size','shading'];
+  const MAIN_FLOW = ['property-type','ownership','permit','connection','meter','roof-type','roof-size','roof-orientation','shading'];
 
   function getQuestion(id) {
     return QUESTIONS.find(q => q.id === id);
@@ -222,10 +229,21 @@ const Wizard = (() => {
   function answer(option, sizeValue) {
     const q = currentQuestion();
     const label = option.label || sizeValue + ' מ"ר';
-    const value = option.value || sizeValue;
+    let value = option.value || sizeValue;
 
     let flagClass = option.flagClass || 'ok';
     let answerLabel = label;
+
+    if (q.id === 'roof-orientation') {
+      const az = parseInt(sizeValue) || 0;
+      const a = (typeof window !== 'undefined' && window.RoofCompass)
+        ? window.RoofCompass.assess(az)
+        : { dir: '', yield: 0, flagClass: 'ok', flag: null };
+      value = String(az);
+      answerLabel = a.dir + ' · ~' + a.yield + '% ' + (a.flagClass === 'ok' ? '✅' : '⚠️');
+      flagClass = a.flagClass;
+      if (a.flag) state.flags.push(a.flag);
+    }
 
     if (q.id === 'roof-size') {
       const sz = parseInt(sizeValue);

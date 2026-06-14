@@ -44,12 +44,11 @@ const Settlements = (() => {
     }).filter(s => s.name);
   }
 
-  // Fetch from Google Sheet, fall back to empty on error
+  // Load from embedded data (settlements-data.js) — no external fetch.
   async function load() {
     try {
-      const res = await fetch(CONFIG.SHEET_CSV_URL);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const text = await res.text();
+      const text = window.SETTLEMENTS_CSV;
+      if (!text) throw new Error('embedded data (SETTLEMENTS_CSV) missing');
       _data = parseCSV(text);
       return { ok: true, count: _data.length };
     } catch (err) {

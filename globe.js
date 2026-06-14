@@ -86,6 +86,7 @@
     const elHud = document.getElementById('target-hud');
     const elName = document.getElementById('th-name');
     const elCap = document.getElementById('globe-caption');
+    const elStage = canvas.closest('.globe-stage');
 
     // Ground-station pings (lat/lon-ish positions on the sphere)
     const pings = Array.from({ length: 5 }, () => ({
@@ -234,7 +235,7 @@
       if (deploy) {
         deploy.t += dt;
         drawDeploy(ssx, ssy, deploy.t);
-        if (deploy.t > 2.8) {
+        if (deploy.t > 3.4) {
           deploy = null;
           if (!target) { desiredSpin = null; if (elCap) elCap.textContent = 'GROUND-STATION SCAN · ISR SECTOR'; }
         }
@@ -245,34 +246,71 @@
 
     function drawDeploy(sx, sy, t) {
       const col = 'rgba(61,240,138,';
-      const dirx = sx - cx, diry = sy - cy;
-      const len = Math.hypot(dirx, diry) || 1;
-      const nx = dirx / len, ny = diry / len;
-      const k = easeOut(Math.min(1, t / 1.3));
-      const headD = len + k * R * 1.25;
-      const hx = cx + nx * headD, hy = cy + ny * headD;
+      // fixed upward-right launch heading (stable even when the site is centred)
+      const dirx = 0.52, diry = -0.86;
+      const reach = R * 1.3;                       // stays within the square stage
+      const rise = easeOut(Math.min(1, t / 1.4));  // 0→1 ascent
+      let hx = sx + dirx * reach * rise;
+      let hy = sy + diry * reach * rise;
+      hx = Math.max(10, Math.min(W - 10, hx));
+      hy = Math.max(10, Math.min(H - 10, hy));
 
-      // ascent trail
-      const grad = ctx.createLinearGradient(sx, sy, hx, hy);
-      grad.addColorStop(0, col + '0)');
-      grad.addColorStop(1, col + (0.9 * (1 - Math.max(0, (t - 1.3) / 1.5))).toFixed(3) + ')');
-      ctx.strokeStyle = grad; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(hx, hy); ctx.stroke();
-
-      // satellite head
-      if (t < 1.6) {
-        ctx.fillStyle = col + '1)';
-        ctx.shadowColor = col + '0.95)'; ctx.shadowBlur = 12;
-        ctx.beginPath(); ctx.arc(hx, hy, 2.6, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
+      // launch burst at the ground site
+      if (t < 0.5) {
+        const b = 1 - t / 0.5;
+        const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, 26 * b + 6);
+        g.addColorStop(0, col + (0.7 * b).toFixed(3) + ')');
+        g.addColorStop(1, col + '0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(sx, sy, 26 * b + 6, 0, Math.PI * 2); ctx.fill();
       }
 
-      // ground confirmation ring
-      if (t > 0.8) {
-        const pp = Math.min(1, (t - 0.8) / 1.8);
-        ctx.strokeStyle = col + (0.5 * (1 - pp)).toFixed(3) + ')';
-        ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.arc(sx, sy, pp * 46, 0, Math.PI * 2); ctx.stroke();
+      // exhaust trail
+      if (rise < 1 || t < 1.8) {
+        const grad = ctx.createLinearGradient(sx, sy, hx, hy);
+        grad.addColorStop(0, col + '0)');
+        grad.addColorStop(0.6, col + (0.35).toFixed(2) + ')');
+        grad.addColorStop(1, col + '0.95)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.lineCap = 'butt';
+      }
+
+      // satellite head with little solar wings
+      if (t < 2.0) {
+        ctx.save();
+        ctx.translate(hx, hy);
+        ctx.shadowColor = col + '0.95)'; ctx.shadowBlur = 14;
+        ctx.fillStyle = col + '1)';
+        ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = col + '0.85)'; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-3, 0);
+        ctx.moveTo(3, 0); ctx.lineTo(7, 0); ctx.stroke();
+        ctx.restore();
+      }
+
+      // expanding ground shock ring
+      if (t > 0.25) {
+        const pp = Math.min(1, (t - 0.25) / 2.0);
+        ctx.strokeStyle = col + (0.55 * (1 - pp)).toFixed(3) + ')';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath(); ctx.arc(sx, sy, pp * (R * 0.9), 0, Math.PI * 2); ctx.stroke();
+      }
+
+      // "deployed" orbit blip pulsing at apex
+      if (t > 1.4) {
+        const op = (t - 1.4);
+        const blip = 2.4 + Math.sin(op * 7) * 1.2;
+        ctx.fillStyle = col + '1)';
+        ctx.shadowColor = col + '0.9)'; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(hx, hy, blip, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        const rp = (op * 0.7) % 1;
+        ctx.strokeStyle = col + (0.45 * (1 - rp)).toFixed(3) + ')';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath(); ctx.arc(hx, hy, 6 + rp * 18, 0, Math.PI * 2); ctx.stroke();
       }
     }
 
@@ -351,6 +389,16 @@
         deploy = { t: 0 };
         desiredSpin = Math.PI / 2 - Math.atan2(site.z, site.x); // face the site
         if (elCap) elCap.textContent = 'SATELLITE DEPLOYED · UPLINK OK';
+        if (elStage) {
+          elStage.classList.remove('deploy-flash');
+          void elStage.offsetWidth;            // restart the CSS animation
+          elStage.classList.add('deploy-flash');
+          // on stacked/mobile layouts the globe sits above — bring it into view
+          const r = elStage.getBoundingClientRect();
+          if (r.bottom < 80 || r.top > window.innerHeight - 80) {
+            elStage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
       },
     };
 

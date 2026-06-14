@@ -188,6 +188,14 @@ body {
   overflow: hidden;
 }
 .globe-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* satellite-deploy confirmation flash */
+.globe-stage.deploy-flash { animation: deployFlash 0.9s ease-out; }
+@keyframes deployFlash {
+  0%   { box-shadow: inset 0 0 0 0 rgba(61,240,138,0); }
+  18%  { box-shadow: inset 0 0 40px 4px rgba(61,240,138,0.55); border-color: var(--green); }
+  100% { box-shadow: inset 0 0 0 0 rgba(61,240,138,0); }
+}
 .globe-caption {
   position: absolute; bottom: 8px; left: 0; right: 0; text-align: center;
   font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em;
@@ -521,6 +529,55 @@ body {
 .size-verdict.ok   { background: rgba(61,240,138,0.1); color: var(--green); border-color: rgba(61,240,138,0.35); }
 .size-verdict.warn { background: rgba(255,178,74,0.1); color: var(--amber-br); border-color: rgba(255,178,74,0.35); }
 .size-verdict.bad  { background: rgba(255,93,108,0.1); color: var(--red); border-color: rgba(255,93,108,0.35); }
+
+/* ===================== ROOF COMPASS ===================== */
+.compass-wrap {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  margin: 6px 0 14px;
+}
+.compass-canvas {
+  width: 260px; max-width: 78%; aspect-ratio: 1 / 1; height: auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, rgba(20,40,70,0.4), rgba(4,7,15,0.15) 72%);
+  box-shadow: 0 0 0 1px var(--line-strong), 0 0 34px rgba(54,230,212,0.12), inset 0 0 30px rgba(0,0,0,0.4);
+  touch-action: none;
+}
+.compass-hint-tag {
+  margin-top: 10px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+  color: var(--muted); direction: rtl;
+}
+.compass-dirs {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 14px;
+}
+.dir-btn {
+  padding: 9px 4px; border: 1px solid var(--line-strong); border-radius: 8px;
+  background: rgba(8,14,28,0.6); color: var(--text-dim);
+  font-family: var(--sans); font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.16s;
+}
+.dir-btn:hover { color: var(--text); border-color: var(--cyan); }
+.dir-btn.active {
+  background: rgba(54,230,212,0.14); border-color: var(--cyan); color: var(--cyan-br);
+  box-shadow: 0 0 14px rgba(54,230,212,0.3);
+}
+.compass-readout {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px;
+}
+.cr-item {
+  display: flex; flex-direction: column; gap: 3px; align-items: center;
+  padding: 10px 6px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--glass); text-align: center;
+}
+.cr-k { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.06em; }
+.cr-v { font-size: 15px; font-weight: 700; color: var(--cyan-br); }
+.cr-v.good { color: var(--green); }
+.cr-v.warn { color: var(--amber-br); }
+.compass-verdict {
+  text-align: center; font-size: 13px; font-weight: 600; line-height: 1.5;
+  padding: 12px; border-radius: 8px; border: 1px solid transparent;
+}
+.compass-verdict.ok   { background: rgba(61,240,138,0.1); color: var(--green); border-color: rgba(61,240,138,0.3); }
+.compass-verdict.warn { background: rgba(255,178,74,0.1); color: var(--amber-br); border-color: rgba(255,178,74,0.3); }
 
 /* ===================== WIZARD RESULTS ===================== */
 .wizard-result {

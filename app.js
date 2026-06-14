@@ -151,13 +151,63 @@ function renderWizard() {
     const slider = document.getElementById('size-slider');
     if (slider) setTimeout(() => updateSizeDisplay(slider.value), 0);
   }
+  if (q && q.type === 'compass') {
+    setTimeout(() => initRoofCompass(180), 0);
+  }
+}
+
+// ============================================================
+// ROOF ORIENTATION COMPASS
+// ============================================================
+let _roofCompass = null;
+
+function initRoofCompass(initialAz) {
+  const canvas = document.getElementById('roof-compass');
+  if (!canvas || !window.RoofCompass) return;
+  _roofCompass = window.RoofCompass.mount(canvas, initialAz, updateCompassReadout);
+  highlightDirBtn(initialAz);
+}
+
+function compassSet(deg) {
+  if (_roofCompass) _roofCompass.set(deg);
+  highlightDirBtn(deg);
+}
+
+function highlightDirBtn(deg) {
+  const d = ((Math.round(deg / 45) * 45) % 360 + 360) % 360;
+  document.querySelectorAll('.dir-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.deg) === d);
+  });
+}
+
+function updateCompassReadout(a) {
+  const dir = document.getElementById('compass-dir');
+  const yld = document.getElementById('compass-yield');
+  const ql = document.getElementById('compass-quality');
+  const v = document.getElementById('compass-verdict');
+  if (dir) dir.textContent = a.dir;
+  if (yld) yld.textContent = '~' + a.yield + '%';
+  if (ql) { ql.textContent = a.quality; ql.className = 'cr-v ' + (a.flagClass === 'ok' ? 'good' : 'warn'); }
+  if (v) {
+    v.className = 'compass-verdict ' + (a.flagClass === 'ok' ? 'ok' : 'warn');
+    v.textContent = a.flag
+      ? a.flag
+      : '☀ ' + a.dir + ' · תפוקה ~' + a.yield + '% — תנוחה ' + a.quality + ' לייצור סולארי';
+  }
+  highlightDirBtn(a.az);
+}
+
+function wizardOrientationConfirm() {
+  const az = _roofCompass ? _roofCompass.get() : 180;
+  Wizard.answer({}, az);
+  renderWizard();
 }
 
 function labelForId(id) {
   const labels = {
     'property-type': 'סוג נכס', 'ownership': 'בעלות', 'permit': 'טופס 4',
     'connection': 'חיבור חשמל', 'meter': 'מונה חשמל', 'roof-type': 'סוג גג',
-    'tiles-age': 'גיל גג רעפים', 'roof-size': 'שטח גג', 'shading': 'הצללות',
+    'tiles-age': 'גיל גג רעפים', 'roof-size': 'שטח גג', 'roof-orientation': 'כיוון גג', 'shading': 'הצללות',
   };
   return labels[id] || id;
 }
@@ -188,6 +238,26 @@ function renderQuestionInput(q) {
         <button class="btn primary" onclick="wizardConfirmRoofs()">אשר בחירת גג</button>
       </div>
       <div id="roof-multi-error" style="color:#e63946;font-size:13px;margin-top:8px;text-align:center;min-height:18px;"></div>`;
+  }
+  if (q.type === 'compass') {
+    const dirs = [['צפון',0],['צ-מז',45],['מזרח',90],['ד-מז',135],['דרום',180],['ד-מע',225],['מערב',270],['צ-מע',315]];
+    return `
+      <div class="compass-wrap">
+        <canvas id="roof-compass" class="compass-canvas" width="300" height="300"></canvas>
+        <div class="compass-hint-tag">גרור את המחוג · או בחר כיוון</div>
+      </div>
+      <div class="compass-dirs">
+        ${dirs.map(([l,d]) => `<button class="dir-btn" data-deg="${d}" onclick="compassSet(${d})">${l}</button>`).join('')}
+      </div>
+      <div class="compass-readout">
+        <div class="cr-item"><span class="cr-k">כיוון</span><span class="cr-v" id="compass-dir">—</span></div>
+        <div class="cr-item"><span class="cr-k">תפוקה משוערת</span><span class="cr-v" id="compass-yield">—</span></div>
+        <div class="cr-item"><span class="cr-k">דירוג</span><span class="cr-v" id="compass-quality">—</span></div>
+      </div>
+      <div class="compass-verdict ok" id="compass-verdict"></div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn primary" onclick="wizardOrientationConfirm()">אשר כיוון גג ←</button>
+      </div>`;
   }
   if (q.type === 'size-input') {
     return `
