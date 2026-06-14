@@ -186,10 +186,10 @@ const Wizard = (() => {
       ],
     },
     {
-      id: 'roof-size',
-      text: 'מה שטח הגג המשוער?',
-      hint: 'ניתן לתת הערכה גסה — לא חייב לדייק',
-      type: 'size-input',
+      id: 'material-sizes',
+      text: 'מה השטח המשוער של כל חלק בגג?',
+      hint: 'ניתן לתת הערכה גסה לכל חומר — סכום השטחים יחושב אוטומטית.',
+      type: 'material-sizes',
       options: [],
     },
     {
@@ -215,7 +215,7 @@ const Wizard = (() => {
     },
   ];
 
-  const MAIN_FLOW = ['property-type','ownership','permit','connection','meter','roof-type','roof-size','roof-orientation','shading'];
+  const MAIN_FLOW = ['property-type','ownership','permit','connection','meter','roof-type','material-sizes','roof-orientation','shading'];
 
   function getQuestion(id) {
     return QUESTIONS.find(q => q.id === id);
@@ -230,7 +230,7 @@ const Wizard = (() => {
     const hasTiles = state.selectedRoofTypes.some(t => t.value === 'tiles') ||
       state.answers.some(a => a.questionId === 'roof-type' && a.value === 'tiles');
     if (hasTiles) {
-      const idx = flow.indexOf('roof-size');
+      const idx = flow.indexOf('material-sizes');
       flow.splice(idx, 0, 'tiles-age');
     }
     return flow;
@@ -248,33 +248,19 @@ const Wizard = (() => {
     }
   }
 
-  // Confirm multi-roof selection and evaluate all selected types
+  // Confirm multi-roof selection. Severity (stop/escalate/flag) is NOT decided
+  // here — it is computed once by evaluateRoof at the material-sizes step, which
+  // is the single source of truth. This just records the selection and advances.
   function confirmRoofTypes() {
     if (state.selectedRoofTypes.length === 0) return { done: false, error: 'בחר לפחות סוג גג אחד' };
-    const q = QUESTIONS.find(q => q.id === 'roof-type');
     const selected = state.selectedRoofTypes;
     const labels = selected.map(t => t.label).join(' + ');
-
-    // Evaluate worst case: stop > escalate > flag > ok
-    const stopOpt  = selected.find(t => t.action === 'stop');
-    const escalOpt = selected.find(t => t.action === 'escalate');
-    const flags    = selected.filter(t => t.action === 'flag');
-
-    const worstClass = stopOpt ? 'bad' : escalOpt ? 'warn' : flags.length ? 'warn' : 'ok';
-    state.answers.push({ questionId: 'roof-type', label: labels, value: selected.map(t => t.value).join('+'), flagClass: worstClass });
-
-    if (stopOpt) {
-      state.outcome = 'stop';
-      state.stopReason = stopOpt.stopReason;
-      state.stopScript = stopOpt.stopScript;
-      return { done: true };
-    }
-    if (escalOpt) {
-      state.outcome = 'escalate';
-      state.escalateNote = escalOpt.escalateNote;
-      return { done: true };
-    }
-    flags.forEach(t => { if (t.flagMsg) state.flags.push(t.flagMsg); });
+    state.answers.push({
+      questionId: 'roof-type',
+      label: labels,
+      value: selected.map(t => t.value).join('+'),
+      flagClass: 'ok',
+    });
 
     state.step++;
     const flow = buildFlow();
@@ -312,22 +298,6 @@ const Wizard = (() => {
       if (a.flag) state.flags.push(a.flag);
     }
 
-    if (q.id === 'roof-size') {
-      const sz = parseInt(sizeValue);
-      if (sz >= CONFIG.ROOF_SIZE_GOOD) { flagClass = 'ok'; answerLabel = sz + ' מ"ר ✅'; }
-      else if (sz >= CONFIG.ROOF_SIZE_BORDERLINE) {
-        flagClass = 'warn'; answerLabel = sz + ' מ"ר ⚠️';
-        state.flags.push('שטח גג ' + sz + ' מ"ר — גבולי. המומחה יאשר התאמה');
-      } else {
-        flagClass = 'bad';
-        state.answers.push({ questionId: q.id, label: answerLabel, value, flagClass });
-        state.outcome = 'stop';
-        state.stopReason = 'שטח גג ' + sz + ' מ"ר — קטן מדי להתקנה (מינימום 60 מ"ר)';
-        state.stopScript = 'לצערנו שטח הגג לא מספיק גדול להתקנה מערכת סולארית. נדרש לפחות 60 מ"ר.';
-        return { done: true };
-      }
-    }
-
     state.answers.push({ questionId: q.id, label: answerLabel, value, flagClass });
 
     if (option.action === 'stop') {
@@ -361,7 +331,50 @@ const Wizard = (() => {
 
   function getState() { return state; }
 
-  return { reset, currentQuestion, currentFlow, answer, getState, toggleRoofType, confirmRoofTypes };
+  // Materials the rep selected, for rendering one size field each.
+  function selectedMaterials() {
+    return state.selectedRoofTypes.map(t => {
+      const mat = roofConfig.materials.find(m => m.id === t.value);
+      return { id: t.value, label: mat ? mat.label : t.value, emoji: mat ? mat.emoji : '' };
+    });
+  }
+
+  // Submit per-material sizes: [{ materialId, size }]. Runs evaluateRoof (the
+  // single source of truth) and maps its outcome onto the wizard state machine.
+  function answerMaterialSizes(sizes) {
+    const r = evaluateRoof(sizes, roofConfig);
+    const recap = r.perMaterial.map(p => `${p.label} ${p.size}מ"ר`).join(' + ');
+    const hasWarn = r.flags.length > 0 || r.perMaterial.some(p => p.outcome === 'warn');
+    state.answers.push({
+      questionId: 'material-sizes',
+      label: recap + (hasWarn ? ' ⚠️' : ' ✅'),
+      value: sizes.map(s => `${s.materialId}:${s.size}`).join(','),
+      flagClass: hasWarn ? 'warn' : 'ok',
+    });
+
+    if (r.outcome === 'stop') {
+      state.outcome = 'stop';
+      state.stopReason = r.stopReason;
+      state.stopScript = r.stopScript;
+      return { done: true };
+    }
+    if (r.outcome === 'escalate') {
+      state.outcome = 'escalate';
+      state.escalateNote = r.escalateNote;
+      return { done: true };
+    }
+    r.flags.forEach(f => { if (f) state.flags.push(f); });
+
+    state.step++;
+    const flow = currentFlow();
+    if (state.step >= flow.length) {
+      state.outcome = state.flags.length > 0 ? 'go-notes' : 'go';
+      return { done: true };
+    }
+    return { done: false };
+  }
+
+  return { reset, currentQuestion, currentFlow, answer, getState, toggleRoofType, confirmRoofTypes, selectedMaterials, answerMaterialSizes };
 })();
 
 if (typeof module !== 'undefined' && module.exports) {
