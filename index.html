@@ -183,14 +183,36 @@
       <nav class="admin-tabs">
         <button class="admin-tab active" data-atab="requests">בקשות</button>
         <button class="admin-tab" data-atab="agents">נציגים</button>
+        <button class="admin-tab" data-atab="roof">הגדרות גג</button>
       </nav>
       <div id="admin-requests" class="admin-pane"></div>
       <div id="admin-agents" class="admin-pane hidden"></div>
+      <div id="admin-roof" class="admin-pane hidden"></div>
       <div class="req-actions">
         <button id="admin-close" class="btn reset">סגור</button>
       </div>
     </div>
   </div>
+
+  <!-- ===== PERSISTENT 3D HOUSE DOCK (bottom-right, large) ===== -->
+  <div id="sim-dock" class="sim-dock">
+    <div class="dock-head">
+      <span class="dock-title"><span class="led led-cyan"></span>סימולציית בית · 3D</span>
+      <button class="dock-toggle" id="sim-dock-toggle" onclick="toggleSimDock()" title="כווץ / הרחב">▾</button>
+    </div>
+    <div class="dock-body">
+      <div class="sim-dock-stage">
+        <span class="corner tl"></span><span class="corner tr"></span>
+        <span class="corner bl"></span><span class="corner br"></span>
+        <canvas id="sim-dock-canvas" class="sim-dock-canvas"></canvas>
+        <div id="sim-dock-msg" class="sim-dock-msg"></div>
+      </div>
+      <div class="sim-dock-hint">↻ גרור לסיבוב · גלגלת לזום</div>
+    </div>
+  </div>
+
+  <!-- ===== MANAGER SETTINGS MODAL HOST ===== -->
+  <div id="settings-modal" class="settings-modal" aria-hidden="true"></div>
 
   <!-- Firebase SDK (modular) exposed as window.firebase for the data layer -->
   <script type="module">
@@ -206,16 +228,24 @@
     window.dispatchEvent(new Event('firebase-ready'));
   </script>
 
+  <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="settlement-coords.js"></script>
   <script src="globe.js"></script>
   <script src="compass.js"></script>
+  <script src="sim-state.js"></script>
+  <script src="sim.js"></script>
   <script src="config.js"></script>
   <script src="requests.js"></script>
   <script src="auth.js"></script>
   <script src="firebase.js"></script>
+  <script src="roof-store.js"></script>
   <script src="settlements-data.js"></script>
   <script src="settlements.js"></script>
   <script src="wizard.js"></script>
   <script src="admin.js"></script>
   <script src="app.js"></script>
+  <script src="settings.js"></script>
+  <script src="settings.js"></script>
 </body>
 </html>

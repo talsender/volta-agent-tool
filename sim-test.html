@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl"><head><meta charset="UTF-8">
+<title>VoltaSim test</title>
+<style>html,body{margin:0;background:#04060e;height:100%} #c{width:100vw;height:100vh;display:block}</style>
+</head><body>
+<canvas id="c"></canvas>
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="sim-state.js"></script>
+<script src="sim.js"></script>
+<script>
+  const cfg = { materials: [
+    { id:'concrete',   label:'בטון',     geometry:'flat' },
+    { id:'tiles',      label:'רעפים',    geometry:'pitched' },
+    { id:'pergola',    label:'פרגולה',   geometry:'pergola' },
+    { id:'insulated',  label:'מבודד',    geometry:'insulated' },
+    { id:'corrugated', label:'איסכורית', geometry:'corrugated' },
+  ]};
+  const state = buildSimState({
+    materials:[
+      {id:'concrete',size:40},{id:'tiles',size:30},{id:'pergola',size:20},
+      {id:'insulated',size:25},{id:'corrugated',size:25}
+    ],
+    azimuth:165, shading:'heavy', propertyType:'private'
+  }, cfg);
+  const sim = VoltaSim.mount(document.getElementById('c'), { interactive:true });
+  sim.update(state);
+</script>
+</body></html>

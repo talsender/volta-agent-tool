@@ -113,6 +113,7 @@ function renderWizard() {
     if (window.VoltaGlobe && (s.outcome === 'go' || s.outcome === 'go-notes')) {
       window.VoltaGlobe.deploy();
     }
+    setTimeout(() => updateSimDock(), 0); // dock reflects the final house
     return;
   }
 
@@ -156,6 +157,41 @@ function renderWizard() {
   if (q && q.type === 'material-sizes') {
     setTimeout(() => updateMaterialSizes(), 0);
   }
+  setTimeout(() => updateSimDock(q && q.type === 'material-sizes' ? readMaterialSizes() : null), 0);
+}
+
+// ============================================================
+// HOUSE SIM — persistent interactive 3D dock (bottom-right)
+// ============================================================
+let _dockSim = null;
+
+function initSimDock() {
+  const canvas = document.getElementById('sim-dock-canvas');
+  const msg = document.getElementById('sim-dock-msg');
+  if (!canvas) return;
+  if (!window.VoltaSim || !VoltaSim.available()) {
+    if (msg) { msg.innerHTML = '⚠ טעינת מנוע התלת-ממד (Three.js) נכשלה.<br>דרוש חיבור אינטרנט — רענן את הדף.'; msg.classList.add('on'); }
+    canvas.style.display = 'none';
+    return;
+  }
+  _dockSim = VoltaSim.mount(canvas, { interactive: true });
+  updateSimDock();
+}
+
+function updateSimDock(liveSizes, liveAz) {
+  if (_dockSim) _dockSim.update(Wizard.getSimInputs(liveSizes, liveAz));
+}
+
+function toggleSimDock() {
+  const d = document.getElementById('sim-dock');
+  if (!d) return;
+  const collapsed = d.classList.toggle('collapsed');
+  const t = document.getElementById('sim-dock-toggle');
+  if (t) t.textContent = collapsed ? '▴' : '▾';
+  if (_dockSim) {
+    _dockSim.setActive(!collapsed);
+    if (!collapsed) setTimeout(() => _dockSim.resize(), 30);
+  }
 }
 
 // ============================================================
@@ -197,6 +233,7 @@ function updateCompassReadout(a) {
       : '☀ ' + a.dir + ' · תפוקה ~' + a.yield + '% — תנוחה ' + a.quality + ' לייצור סולארי';
   }
   highlightDirBtn(a.az);
+  updateSimDock(null, a.az); // live: rotate the house/sun as the compass turns
 }
 
 function wizardOrientationConfirm() {
@@ -356,6 +393,7 @@ function updateMaterialSizes() {
   if (sum >= good) { v.className = 'msize-verdict ok'; v.textContent = `✅ ${sum} מ"ר — שטח מתאים`; }
   else if (sum >= border) { v.className = 'msize-verdict warn'; v.textContent = `⚠️ ${sum} מ"ר — גבולי, המומחה יאשר`; }
   else { v.className = 'msize-verdict bad'; v.textContent = `❌ ${sum} מ"ר — קטן מדי (מינימום ${border} מ"ר)`; }
+  updateSimDock(readMaterialSizes());
 }
 
 function materialSizesConfirm() {
@@ -462,6 +500,10 @@ function renderWizardResult() {
     </div>
   </div>`;
 }
+
+// Double-click the logo → password → manager settings panel.
+// Roof-settings entry is now unified into the manager panel (admin.js); this
+// standalone dbl-click entry was removed to avoid a duplicate manager gesture.
 
 function initWizard() {
   Wizard.reset();
@@ -622,6 +664,12 @@ async function init() {
   initAgentAuth();
   initMyRequests();
   if (typeof initManagerPanel === 'function') initManagerPanel();
+  // The roof-settings editor is launched from inside the unified manager panel
+  // (its "הגדרות גג" tab). We keep only its post-save refresh hook here — its
+  // separate dbl-click entry is intentionally not wired (see admin.js).
+  if (window.Settings && Settings.setOnSaved) {
+    Settings.setOnSaved(() => { if (typeof initWizard === 'function') initWizard(); });
+  }
 
   const statusEl = document.getElementById('data-status');
   statusEl.textContent = 'טוען נתוני יישובים...';
@@ -635,6 +683,7 @@ async function init() {
 
   if (typeof initWizard === 'function') initWizard();
   initDockCompass();
+  initSimDock();
 }
 
 document.addEventListener('DOMContentLoaded', init);

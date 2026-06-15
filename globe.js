@@ -77,6 +77,43 @@
       });
     })();
 
+    // --- map real (lat,lon) → a point on this globe, using the same tangent
+    //     projection as the Israel outline (so a settlement lands at its true spot) ---
+    const PROJ = (() => {
+      const DEG = Math.PI / 180;
+      const lon0 = 35.0 * DEG, lat0 = 31.8 * DEG;
+      const Pv = [site.x, site.y, site.z];
+      const crossv = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+      const normv = v => { const m = Math.hypot(v[0],v[1],v[2])||1; return [v[0]/m,v[1]/m,v[2]/m]; };
+      const eastv = normv(crossv([0,1,0], Pv));
+      const northv = crossv(Pv, eastv);
+      const f = 2.0, asp = Math.cos(lat0);
+      return (lonDeg, latDeg) => {
+        const du = (lonDeg*DEG - lon0) * asp * f;
+        const dv = (latDeg*DEG - lat0) * f;
+        const v = normv([Pv[0]+eastv[0]*du+northv[0]*dv, Pv[1]+eastv[1]*du+northv[1]*dv, Pv[2]+eastv[2]*du+northv[2]*dv]);
+        return { x: v[0], y: v[1], z: v[2] };
+      };
+    })();
+
+    const HEB_FINAL = { 'ך':'כ','ם':'מ','ן':'נ','ף':'פ','ץ':'צ' };
+    function normName(s) {
+      if (!s) return '';
+      return String(s).trim()
+        .replace(/[)(\]\[]/g, ' ')
+        .replace(/['"`׳״]/g, '')
+        .replace(/[־\-–—]/g, '')
+        .replace(/[ךםןףץ]/g, c => HEB_FINAL[c])
+        .replace(/\s+/g, '');
+    }
+    // sphere point for a settlement name, or null if unknown
+    function siteForName(name) {
+      const C = (typeof window !== 'undefined') && window.SETTLEMENT_COORDS;
+      if (!C) return null;
+      const ll = C[normName(name)];
+      return ll ? PROJ(ll[1], ll[0]) : null;   // [lat,lon] → PROJ(lon,lat)
+    }
+
     const STATUS_COL = {
       yes:     'rgba(61,240,138,',
       no:      'rgba(255,93,108,',
@@ -228,8 +265,11 @@
       // --- front orbit rings + satellites ---
       drawOrbits(sats, spin, false);
 
-      // --- target-lock reticle over the ground site ---
-      if (target) drawReticle(ssx, ssy, target);
+      // --- target-lock reticle over the settlement's real location ---
+      if (target) {
+        const tp = rot(target.pt || site, spin);
+        drawReticle(cx + tp.x * R, cy - tp.y * R, target);
+      }
 
       // --- satellite deployment launch ---
       if (deploy) {
@@ -371,8 +411,9 @@
     // ---- public API: wire the globe to the app's settlement search ----
     window.VoltaGlobe = {
       lockTarget(name, status) {
-        target = { name: name || '', status: status || 'unknown', t: 0 };
-        desiredSpin = Math.PI / 2 - Math.atan2(site.z, site.x); // bring site to front
+        const pt = siteForName(name) || site;        // real location, or generic site
+        target = { name: name || '', status: status || 'unknown', t: 0, pt };
+        desiredSpin = Math.PI / 2 - Math.atan2(pt.z, pt.x); // bring the target to front
         if (elHud) { elHud.classList.add('active'); elHud.dataset.status = target.status; }
         if (elName) elName.textContent = name || '—';
         if (elCap) elCap.textContent = 'TARGET ACQUIRED · LOCKING';

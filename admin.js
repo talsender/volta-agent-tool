@@ -6,6 +6,12 @@ const Admin = (() => {
   let _reqFilter = 'pending'; // 'pending' | 'all'
 
   function managerPassword() {
+    // Prefer the live (manager-editable) password from RoofStore, so the unified
+    // entry honors any change made in the roof-settings editor.
+    if (typeof RoofStore !== 'undefined' && RoofStore.get) {
+      const cfg = RoofStore.get();
+      if (cfg && cfg.managerPassword) return cfg.managerPassword;
+    }
     return (typeof DEFAULT_ROOF_CONFIG !== 'undefined' && DEFAULT_ROOF_CONFIG.managerPassword)
       || 'volta';
   }
@@ -15,6 +21,7 @@ const Admin = (() => {
     _open = true;
     renderRequests();
     renderAgents();
+    renderRoof();
   }
   function close() {
     document.getElementById('admin-modal').classList.add('hidden');
@@ -32,6 +39,26 @@ const Admin = (() => {
       t.classList.toggle('active', t.dataset.atab === name));
     document.getElementById('admin-requests').classList.toggle('hidden', name !== 'requests');
     document.getElementById('admin-agents').classList.toggle('hidden', name !== 'agents');
+    document.getElementById('admin-roof').classList.toggle('hidden', name !== 'roof');
+  }
+
+  // ---- roof settings tab (launches the existing roof Settings editor) ----
+  function renderRoof() {
+    const pane = document.getElementById('admin-roof');
+    if (!pane) return;
+    if (typeof Settings === 'undefined' || !window.Settings) {
+      pane.innerHTML = '<div class="my-req-empty">עורך הגדרות הגג לא נטען.</div>';
+      return;
+    }
+    pane.innerHTML = `
+      <div class="my-req-empty" style="text-align:right;padding:8px 0 14px">
+        עריכת ספי גודל, גיל גג, חומרים וכללי גודל — משותף לכל הנציגים.
+      </div>
+      <button class="btn primary" onclick="Admin.openRoofSettings()">פתח עורך הגדרות גג ←</button>`;
+  }
+
+  function openRoofSettings() {
+    if (window.Settings) Settings.open();
   }
 
   // ---- requests tab ----
@@ -153,6 +180,7 @@ const Admin = (() => {
     init,
     filterReq, approve, reject,
     addAgent, toggleAgent, removeAgent,
+    openRoofSettings,
   };
 })();
 
