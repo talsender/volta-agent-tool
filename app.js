@@ -107,18 +107,12 @@ function renderWizard() {
 
   if (s.outcome) {
     container.innerHTML = renderWizardResult();
-    hideMiniSim(); // restore the globe so the satellite-deploy animation is visible
     if (window.VoltaGlobe && (s.outcome === 'go' || s.outcome === 'go-notes')) {
       window.VoltaGlobe.deploy();
     }
-    if (s.outcome === 'go' || s.outcome === 'go-notes') {
-      setTimeout(() => mountFullSim(), 0);
-    }
+    setTimeout(() => updateSimDock(), 0); // dock reflects the final house
     return;
   }
-
-  // Left the result screen — release the full sim's WebGL context.
-  if (_fullSim) { _fullSim.dispose(); _fullSim = null; }
 
   const flow = Wizard.currentFlow();
   const total = flow.length;
@@ -160,59 +154,41 @@ function renderWizard() {
   if (q && q.type === 'material-sizes') {
     setTimeout(() => updateMaterialSizes(), 0);
   }
-  if (q && ROOF_STEPS.has(q.id)) {
-    setTimeout(() => updateMiniSim(q.id === 'material-sizes' ? readMaterialSizes() : null), 0);
-  } else {
-    hideMiniSim();
-  }
+  setTimeout(() => updateSimDock(q && q.type === 'material-sizes' ? readMaterialSizes() : null), 0);
 }
 
 // ============================================================
-// HOUSE SIM (side-panel mini preview)
+// HOUSE SIM — persistent interactive 3D dock (bottom-right)
 // ============================================================
-let _miniSim = null;
-const ROOF_STEPS = new Set(['roof-type', 'tiles-age', 'material-sizes', 'roof-orientation', 'shading']);
+let _dockSim = null;
 
-function ensureMiniSim() {
-  if (!window.VoltaSim || !VoltaSim.available()) return null;
-  const stage = document.querySelector('.globe-stage');
-  if (!stage) return null;
-  let canvas = document.getElementById('sim-canvas');
-  if (!canvas) {
-    canvas = document.createElement('canvas');
-    canvas.id = 'sim-canvas';
-    canvas.className = 'sim-canvas';
-    stage.appendChild(canvas);
-  }
-  stage.classList.add('sim-on');
-  if (!_miniSim) _miniSim = VoltaSim.mount(canvas, { interactive: false });
-  if (_miniSim) _miniSim.setActive(true);
-  return _miniSim;
-}
-
-function hideMiniSim() {
-  const stage = document.querySelector('.globe-stage');
-  if (stage) stage.classList.remove('sim-on');
-  if (_miniSim) _miniSim.setActive(false); // restore globe + stop rendering off-screen
-}
-
-function updateMiniSim(liveSizes, liveAz) {
-  const sim = ensureMiniSim();
-  if (!sim) return;
-  sim.update(Wizard.getSimInputs(liveSizes, liveAz));
-}
-
-let _fullSim = null;
-function mountFullSim() {
-  const canvas = document.getElementById('sim-full-canvas');
-  if (!canvas || !window.VoltaSim || !VoltaSim.available()) {
-    const box = canvas && canvas.closest('.sim-full');
-    if (box) box.style.display = 'none'; // graceful fallback: no Three.js → hide block
+function initSimDock() {
+  const canvas = document.getElementById('sim-dock-canvas');
+  const msg = document.getElementById('sim-dock-msg');
+  if (!canvas) return;
+  if (!window.VoltaSim || !VoltaSim.available()) {
+    if (msg) { msg.innerHTML = '⚠ טעינת מנוע התלת-ממד (Three.js) נכשלה.<br>דרוש חיבור אינטרנט — רענן את הדף.'; msg.classList.add('on'); }
+    canvas.style.display = 'none';
     return;
   }
-  if (_fullSim) _fullSim.dispose();
-  _fullSim = VoltaSim.mount(canvas, { interactive: true });
-  _fullSim.update(Wizard.getSimInputs());
+  _dockSim = VoltaSim.mount(canvas, { interactive: true });
+  updateSimDock();
+}
+
+function updateSimDock(liveSizes, liveAz) {
+  if (_dockSim) _dockSim.update(Wizard.getSimInputs(liveSizes, liveAz));
+}
+
+function toggleSimDock() {
+  const d = document.getElementById('sim-dock');
+  if (!d) return;
+  const collapsed = d.classList.toggle('collapsed');
+  const t = document.getElementById('sim-dock-toggle');
+  if (t) t.textContent = collapsed ? '▴' : '▾';
+  if (_dockSim) {
+    _dockSim.setActive(!collapsed);
+    if (!collapsed) setTimeout(() => _dockSim.resize(), 30);
+  }
 }
 
 // ============================================================
@@ -254,7 +230,7 @@ function updateCompassReadout(a) {
       : '☀ ' + a.dir + ' · תפוקה ~' + a.yield + '% — תנוחה ' + a.quality + ' לייצור סולארי';
   }
   highlightDirBtn(a.az);
-  updateMiniSim(null, a.az); // live: rotate the house/sun as the compass turns
+  updateSimDock(null, a.az); // live: rotate the house/sun as the compass turns
 }
 
 function wizardOrientationConfirm() {
@@ -414,7 +390,7 @@ function updateMaterialSizes() {
   if (sum >= good) { v.className = 'msize-verdict ok'; v.textContent = `✅ ${sum} מ"ר — שטח מתאים`; }
   else if (sum >= border) { v.className = 'msize-verdict warn'; v.textContent = `⚠️ ${sum} מ"ר — גבולי, המומחה יאשר`; }
   else { v.className = 'msize-verdict bad'; v.textContent = `❌ ${sum} מ"ר — קטן מדי (מינימום ${border} מ"ר)`; }
-  updateMiniSim(readMaterialSizes());
+  updateSimDock(readMaterialSizes());
 }
 
 function materialSizesConfirm() {
@@ -455,7 +431,6 @@ function renderWizardResult() {
     return `<div class="wizard-result go">
       <div class="wr-header"><div class="wr-icon">✅</div><div class="wr-title">ניתן לתאם שיחת מומחה</div></div>
       <div class="answers-recap">${recap}</div>
-      <div class="sim-full"><span class="sim-tag">תצוגת תכנון · 3D</span><canvas id="sim-full-canvas"></canvas></div>
       <div class="btn-row">
         <button class="btn primary">📅 תאם שיחת מומחה</button>
         <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
@@ -469,7 +444,6 @@ function renderWizardResult() {
       <div class="wr-header"><div class="wr-icon">⚠️</div><div class="wr-title">ניתן לקדם — שים לב להערות</div></div>
       <div class="answers-recap">${recap}</div>
       ${flags}
-      <div class="sim-full"><span class="sim-tag">תצוגת תכנון · 3D</span><canvas id="sim-full-canvas"></canvas></div>
       <div class="btn-row">
         <button class="btn primary">📅 תאם שיחת מומחה</button>
         <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
@@ -562,6 +536,7 @@ async function init() {
 
   if (typeof initWizard === 'function') initWizard();
   initDockCompass();
+  initSimDock();
 }
 
 document.addEventListener('DOMContentLoaded', init);
