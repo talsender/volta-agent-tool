@@ -9,7 +9,6 @@ const VoltaSim = (() => {
     flat: 0x3b4d63, pitched: 0x8a3b2e, pergola: 0x7a5a30,
     insulated: 0x53627a, corrugated: 0x566274, light: 0xff5d6c,
   };
-  const PANEL_OK = new Set(['flat', 'insulated', 'corrugated', 'pergola']);
 
   function mount(canvas, opts) {
     if (!available()) return null;
@@ -125,37 +124,120 @@ const VoltaSim = (() => {
     walls.castShadow = true; walls.receiveShadow = true;
     group.add(walls);
 
-    // roof slabs laid along X, widths proportional to areaShare, total = side
-    const slabThick = 0.35;
+    // roof parts laid along X, widths proportional to areaShare, total = side
     const parts = s.parts.length ? s.parts : [{ geometry: 'flat', areaShare: 1, id: '_', size: 0 }];
     let x = -side / 2;
     parts.forEach(part => {
       const w = side * (part.areaShare || (1 / parts.length));
-      const color = MAT_COLOR[part.geometry] || MAT_COLOR.flat;
-      const slabMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.7, metalness: 0.15 });
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.4, w - 0.1), slabThick, depth), slabMat);
-      slab.position.set(x + w / 2, wallH + slabThick / 2, 0);
-      slab.castShadow = true; slab.receiveShadow = true;
-      group.add(slab);
-
-      if (PANEL_OK.has(part.geometry)) addPanels(group, x + w / 2, wallH + slabThick, w, depth, part.size);
+      makeRoofPart(group, part.geometry, x + w / 2, Math.max(0.5, w - 0.1), depth, wallH);
       x += w;
     });
   }
 
-  function addPanels(group, cx, topY, w, depth, area) {
+  // dispatch per material geometry
+  function makeRoofPart(group, geometry, cx, w, depth, baseY) {
+    if (geometry === 'pitched') return makePitched(group, cx, w, depth, baseY);
+    if (geometry === 'pergola') return makePergola(group, cx, w, depth, baseY);
+    if (geometry === 'corrugated') return makeCorrugated(group, cx, w, depth, baseY);
+    if (geometry === 'light') return makeSlab(group, cx, w, depth, baseY, MAT_COLOR.light, false);
+    // flat (concrete) and insulated → metallic slab with panels
+    const metal = geometry === 'insulated' ? 0.55 : 0.15;
+    return makeSlab(group, cx, w, depth, baseY, MAT_COLOR[geometry] || MAT_COLOR.flat, true, metal);
+  }
+
+  function makeSlab(group, cx, w, depth, baseY, color, panels, metalness) {
+    const t = 0.35;
+    const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.7, metalness: (metalness == null ? 0.15 : metalness) });
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, t, depth), mat);
+    slab.position.set(cx, baseY + t / 2, 0);
+    slab.castShadow = true; slab.receiveShadow = true;
+    group.add(slab);
+    if (panels) { const g = panelGrid(w, depth); g.position.set(cx, baseY + t + 0.06, 0); group.add(g); }
+  }
+
+  // gabled tiled roof: two slopes meeting at a ridge running along z
+  function makePitched(group, cx, w, depth, baseY) {
+    const rh = Math.min(w, depth) * 0.42;            // ridge height
+    const ang = Math.atan2(rh, w / 2);
+    const slopeLen = Math.hypot(w / 2, rh);
+    const mat = new THREE.MeshStandardMaterial({ color: MAT_COLOR.pitched, roughness: 0.85, metalness: 0.05 });
+    [-1, 1].forEach(sgn => {
+      const slope = new THREE.Mesh(new THREE.BoxGeometry(slopeLen, 0.18, depth), mat);
+      slope.position.set(cx + sgn * w / 4, baseY + rh / 2, 0);
+      slope.rotation.z = -sgn * ang;
+      slope.castShadow = true; slope.receiveShadow = true;
+      group.add(slope);
+      // panels lying on the slope
+      const g = panelGrid(slopeLen * 0.86, depth * 0.86);
+      g.rotation.z = -sgn * ang;
+      g.position.set(cx + sgn * w / 4 - sgn * Math.sin(ang) * 0.12, baseY + rh / 2 + Math.cos(ang) * 0.14, 0);
+      group.add(g);
+    });
+    // gable end triangles (thin) for a closed look
+    const triShape = new THREE.Shape();
+    triShape.moveTo(-w / 2, 0); triShape.lineTo(w / 2, 0); triShape.lineTo(0, rh); triShape.closePath();
+    const tri = new THREE.Mesh(new THREE.ExtrudeGeometry(triShape, { depth: 0.1, bevelEnabled: false }),
+      new THREE.MeshStandardMaterial({ color: 0x2a2440, roughness: 1 }));
+    tri.position.set(cx, baseY, -depth / 2); tri.castShadow = true; group.add(tri);
+    const tri2 = tri.clone(); tri2.position.set(cx, baseY, depth / 2); group.add(tri2);
+  }
+
+  // open pergola: corner posts + perimeter beams + slats (alt. PV slats)
+  function makePergola(group, cx, w, depth, baseY) {
+    const wood = new THREE.MeshStandardMaterial({ color: MAT_COLOR.pergola, roughness: 0.9 });
+    const top = baseY + 0.4;
+    const post = (px, pz) => {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.4, 0.18), wood);
+      p.position.set(px, baseY + 0.2, pz); p.castShadow = true; group.add(p);
+    };
+    post(cx - w / 2 + 0.2, -depth / 2 + 0.2); post(cx + w / 2 - 0.2, -depth / 2 + 0.2);
+    post(cx - w / 2 + 0.2, depth / 2 - 0.2); post(cx + w / 2 - 0.2, depth / 2 - 0.2);
+    // two beams along z
+    [-1, 1].forEach(sgn => {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, depth), wood);
+      beam.position.set(cx + sgn * (w / 2 - 0.2), top, 0); beam.castShadow = true; group.add(beam);
+    });
+    // slats across x; every other slat is a PV slat
+    const pv = new THREE.MeshStandardMaterial({ color: 0x1b3a8a, emissive: 0x16306e, emissiveIntensity: 0.5, roughness: 0.35, metalness: 0.6 });
+    const n = Math.max(4, Math.round(depth / 0.7));
+    for (let i = 0; i < n; i++) {
+      const z = -depth / 2 + 0.3 + (depth - 0.6) * (i / (n - 1));
+      const slat = new THREE.Mesh(new THREE.BoxGeometry(w - 0.3, 0.07, 0.22), i % 2 ? pv : wood);
+      slat.position.set(cx, top + 0.05, z); slat.castShadow = true; group.add(slat);
+    }
+  }
+
+  // corrugated metal sheet: thin base + ribs running along z
+  function makeCorrugated(group, cx, w, depth, baseY) {
+    const mat = new THREE.MeshStandardMaterial({ color: MAT_COLOR.corrugated, roughness: 0.5, metalness: 0.7 });
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, depth), mat);
+    base.position.set(cx, baseY + 0.06, 0); base.castShadow = true; base.receiveShadow = true; group.add(base);
+    const ribs = Math.max(4, Math.round(w / 0.5));
+    for (let i = 0; i < ribs; i++) {
+      const rx = cx - w / 2 + (w) * ((i + 0.5) / ribs);
+      const rib = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, depth, 6), mat);
+      rib.rotation.x = Math.PI / 2;
+      rib.position.set(rx, baseY + 0.16, 0); rib.castShadow = true; group.add(rib);
+    }
+    const g = panelGrid(w * 0.7, depth * 0.7); g.position.set(cx, baseY + 0.24, 0); group.add(g);
+  }
+
+  // a flat grid of PV panels centered at origin in the xz-plane (y=0)
+  function panelGrid(w, depth) {
+    const grp = new THREE.Group();
     const cols = Math.max(1, Math.round(w / 1.1));
     const rows = Math.max(1, Math.round(depth / 1.4));
-    const pw = (w * 0.82) / cols, pd = (depth * 0.82) / rows;
+    const pw = (w * 0.9) / cols, pd = (depth * 0.9) / rows;
     const mat = new THREE.MeshStandardMaterial({ color: 0x1b3a8a, emissive: 0x16306e, emissiveIntensity: 0.5, roughness: 0.35, metalness: 0.6 });
     for (let i = 0; i < cols; i++) {
       for (let j = 0; j < rows; j++) {
-        const panel = new THREE.Mesh(new THREE.BoxGeometry(pw * 0.92, 0.08, pd * 0.92), mat);
-        panel.position.set(cx - w * 0.41 + pw * (i + 0.5), topY + 0.06, -depth * 0.41 + pd * (j + 0.5));
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(pw * 0.9, 0.08, pd * 0.9), mat);
+        panel.position.set(-w * 0.45 + pw * (i + 0.5), 0, -depth * 0.45 + pd * (j + 0.5));
         panel.castShadow = true;
-        group.add(panel);
+        grp.add(panel);
       }
     }
+    return grp;
   }
 
   function buildObstacles(group, s) {
