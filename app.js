@@ -116,6 +116,9 @@ function renderWizard() {
     return;
   }
 
+  // Left the result screen — release the full sim's WebGL context.
+  if (_fullSim) { _fullSim.dispose(); _fullSim = null; }
+
   const flow = Wizard.currentFlow();
   const total = flow.length;
   const current = s.step + 1;
