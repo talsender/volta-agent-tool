@@ -75,16 +75,19 @@ const Wizard = (() => {
     selectedRoofTypes: [],
   };
 
-  // roofConfig is the single source of truth for materials/thresholds.
-  // Falls back to safe defaults if config.js failed to define it.
-  const roofConfig = (typeof DEFAULT_ROOF_CONFIG !== 'undefined')
-    ? DEFAULT_ROOF_CONFIG
-    : { materials: [], totalSizeThresholds: { good: 70, borderline: 60 }, tilesAgeWarning: 25 };
+  // Live config (manager-editable). Read through RoofStore each time so edits
+  // take effect on the next customer without a page reload. Falls back to the
+  // shipped defaults if RoofStore/DEFAULT_ROOF_CONFIG are unavailable.
+  function cfg() {
+    if (typeof RoofStore !== 'undefined') return RoofStore.get();
+    if (typeof DEFAULT_ROOF_CONFIG !== 'undefined') return DEFAULT_ROOF_CONFIG;
+    return { materials: [], totalSizeThresholds: { good: 70, borderline: 60 }, tilesAgeWarning: 25 };
+  }
 
   // Build roof-type multi-select options from the materials list. Message
   // fields are flattened to the top level for the existing confirm flow.
   function roofTypeOptions() {
-    return roofConfig.materials.map(m => ({
+    return cfg().materials.map(m => ({
       label: `${m.emoji} ${m.label}`,
       value: m.id,
       flagClass: m.baseFlagClass,
@@ -339,7 +342,7 @@ const Wizard = (() => {
   // Materials the rep selected, for rendering one size field each.
   function selectedMaterials() {
     return state.selectedRoofTypes.map(t => {
-      const mat = roofConfig.materials.find(m => m.id === t.value);
+      const mat = cfg().materials.find(m => m.id === t.value);
       return { id: t.value, label: mat ? mat.label : t.value, emoji: mat ? mat.emoji : '' };
     });
   }
@@ -347,7 +350,7 @@ const Wizard = (() => {
   // Submit per-material sizes: [{ materialId, size }]. Runs evaluateRoof (the
   // single source of truth) and maps its outcome onto the wizard state machine.
   function answerMaterialSizes(sizes) {
-    const r = evaluateRoof(sizes, roofConfig);
+    const r = evaluateRoof(sizes, cfg());
     state.materialSizes = sizes.filter(s => (parseInt(s.size) || 0) > 0);
     const recap = r.perMaterial.map(p => `${p.label} ${p.size}מ"ר`).join(' + ');
     const hasWarn = r.flags.length > 0 || r.perMaterial.some(p => p.outcome === 'warn');
