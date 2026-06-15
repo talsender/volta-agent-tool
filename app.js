@@ -521,6 +521,22 @@ function renderWizardResult() {
   </div>`;
 }
 
+// Double-click the logo → password → manager settings panel.
+function initManagerSettings() {
+  const logo = document.querySelector('.logo');
+  if (!logo || !window.Settings) return;
+  logo.style.cursor = 'pointer';
+  logo.title = 'לחיצה כפולה — הגדרות מנהל';
+  logo.addEventListener('dblclick', () => {
+    const cfg = window.RoofStore ? RoofStore.get() : null;
+    const pass = prompt('סיסמת מנהל:');
+    if (pass == null) return;
+    if (cfg && pass === cfg.managerPassword) Settings.open();
+    else alert('סיסמה שגויה');
+  });
+  Settings.setOnSaved(() => { if (typeof initWizard === 'function') initWizard(); });
+}
+
 function initWizard() {
   Wizard.reset();
   renderWizard();
@@ -532,6 +548,7 @@ function initWizard() {
 async function init() {
   initTabs();
   initSettlementTab();
+  initManagerSettings();
 
   const statusEl = document.getElementById('data-status');
   statusEl.textContent = 'טוען נתוני יישובים...';
