@@ -222,7 +222,8 @@ const Wizard = (() => {
   }
 
   function reset() {
-    state = { step: 0, answers: [], flags: [], outcome: null, stopReason: '', stopScript: '', escalateNote: '', followUpNote: '', selectedRoofTypes: [] };
+    state = { step: 0, answers: [], flags: [], outcome: null, stopReason: '', stopScript: '', escalateNote: '', followUpNote: '', selectedRoofTypes: [],
+      materialSizes: [], orientationAz: 180, shading: 'none', propertyType: 'private' };
   }
 
   function buildFlow() {
@@ -293,10 +294,14 @@ const Wizard = (() => {
         ? window.RoofCompass.assess(az)
         : { dir: '', yield: 0, flagClass: 'ok', flag: null };
       value = String(az);
+      state.orientationAz = az;
       answerLabel = a.dir + ' · ~' + a.yield + '% ' + (a.flagClass === 'ok' ? '✅' : '⚠️');
       flagClass = a.flagClass;
       if (a.flag) state.flags.push(a.flag);
     }
+
+    if (q.id === 'shading') state.shading = value;
+    if (q.id === 'property-type') state.propertyType = value;
 
     state.answers.push({ questionId: q.id, label: answerLabel, value, flagClass });
 
@@ -343,6 +348,7 @@ const Wizard = (() => {
   // single source of truth) and maps its outcome onto the wizard state machine.
   function answerMaterialSizes(sizes) {
     const r = evaluateRoof(sizes, roofConfig);
+    state.materialSizes = sizes.filter(s => (parseInt(s.size) || 0) > 0);
     const recap = r.perMaterial.map(p => `${p.label} ${p.size}מ"ר`).join(' + ');
     const hasWarn = r.flags.length > 0 || r.perMaterial.some(p => p.outcome === 'warn');
     state.answers.push({
@@ -374,7 +380,23 @@ const Wizard = (() => {
     return { done: false };
   }
 
-  return { reset, currentQuestion, currentFlow, answer, getState, toggleRoofType, confirmRoofTypes, selectedMaterials, answerMaterialSizes };
+  // Current inputs for the 3D sim. Sizes come from the confirmed material-sizes
+  // answer; pass liveSizes (from the DOM) to preview before confirming.
+  function getSimInputs(liveSizes) {
+    const materials = liveSizes && liveSizes.length
+      ? liveSizes
+      : (state.materialSizes && state.materialSizes.length
+          ? state.materialSizes
+          : state.selectedRoofTypes.map(t => ({ id: t.value, size: 0 })));
+    return {
+      materials: materials.map(m => ({ id: m.materialId || m.id, size: m.size })),
+      azimuth: (typeof state.orientationAz === 'number') ? state.orientationAz : 180,
+      shading: state.shading || 'none',
+      propertyType: state.propertyType || 'private',
+    };
+  }
+
+  return { reset, currentQuestion, currentFlow, answer, getState, toggleRoofType, confirmRoofTypes, selectedMaterials, answerMaterialSizes, getSimInputs };
 })();
 
 if (typeof module !== 'undefined' && module.exports) {
