@@ -7,12 +7,12 @@ const CONFIG = {
   // הדבק כאן את ערכי ה-config מפרויקט ה-Firebase שלך.
   // ניהול בקשות החריגה והנציגים נשמר ב-Firestore.
   FIREBASE_CONFIG: {
-    apiKey: 'REPLACE_ME',
-    authDomain: 'REPLACE_ME.firebaseapp.com',
-    projectId: 'REPLACE_ME',
-    storageBucket: 'REPLACE_ME.appspot.com',
-    messagingSenderId: 'REPLACE_ME',
-    appId: 'REPLACE_ME',
+    apiKey: 'AIzaSyAgbJWir2bpJyn3iBGV9VcuF0AZrBnGxkw',
+    authDomain: 'volta-city.firebaseapp.com',
+    projectId: 'volta-city',
+    storageBucket: 'volta-city.firebasestorage.app',
+    messagingSenderId: '87123573134',
+    appId: '1:87123573134:web:43703b06c81c6584e50cdf',
   },
 };
 
