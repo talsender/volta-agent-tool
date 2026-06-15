@@ -4,16 +4,24 @@ const Settings = (() => {
   let onSaved = null;
   const OUTCOMES = [['ok', 'תקין'], ['warn', 'אזהרה'], ['escalate', 'הסלמה'], ['stop', 'עצירה']];
   const ACTIONS = [['', 'ללא'], ['flag', 'דגל'], ['escalate', 'הסלמה'], ['stop', 'עצירה'], ['tiles-age', 'שאלת גיל']];
+  const GEOMS = [['flat', 'שטוח'], ['pitched', 'משופע (רעפים)'], ['pergola', 'פרגולה'], ['insulated', 'מבודד'], ['corrugated', 'איסכורית'], ['light', 'בנייה קלה']];
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
   function host() { return document.getElementById('settings-modal'); }
 
+  function onKey(e) { if (e.key === 'Escape') close(); }
+
   function open() {
     draft = (typeof RoofStore !== 'undefined') ? RoofStore.get() : null;
     if (!draft) return;
+    document.addEventListener('keydown', onKey);
     render();
   }
-  function close() { const h = host(); if (h) { h.classList.remove('on'); h.innerHTML = ''; } }
+  function close() {
+    const h = host();
+    if (h) { h.classList.remove('on'); h.setAttribute('aria-hidden', 'true'); h.innerHTML = ''; }
+    document.removeEventListener('keydown', onKey);
+  }
 
   function sel(options, val) {
     return options.map(([v, l]) => `<option value="${esc(v)}"${String(v) === String(val == null ? '' : val) ? ' selected' : ''}>${esc(l)}</option>`).join('');
@@ -53,6 +61,7 @@ const Settings = (() => {
         </div>
       </div>`;
     h.classList.add('on');
+    h.setAttribute('aria-hidden', 'false');
   }
 
   function materialCard(m, i) {
@@ -77,8 +86,8 @@ const Settings = (() => {
           <label>פעולת בסיס
             <select onchange="Settings.setMat(${i},'baseAction',this.value)">${sel(ACTIONS, m.baseAction || '')}</select>
           </label>
-          <label>גאומטריה
-            <input type="text" value="${esc(m.geometry)}" oninput="Settings.setMat(${i},'geometry',this.value)">
+          <label>גאומטריה (לסימולציה)
+            <select onchange="Settings.setMat(${i},'geometry',this.value)">${sel(GEOMS, m.geometry || 'flat')}</select>
           </label>
         </div>
         ${showFlag ? `<label class="mat-msg">הודעת דגל<input type="text" value="${esc(msg.flagMsg)}" oninput="Settings.setMsg(${i},'flagMsg',this.value)"></label>` : ''}
@@ -102,7 +111,13 @@ const Settings = (() => {
   }
   function addRule(i) { (draft.materials[i].sizeRules = draft.materials[i].sizeRules || []).push({ upTo: null, outcome: 'ok', message: '' }); render(); }
   function delRule(i, j) { draft.materials[i].sizeRules.splice(j, 1); render(); }
-  function addMaterial() { draft.materials.push({ id: 'mat' + (draft.materials.length + 1), label: 'חומר חדש', emoji: '🏠', baseFlagClass: 'ok', baseAction: null, geometry: 'flat', messages: { flagMsg: '', escalateNote: '', stopReason: '', stopScript: '' }, sizeRules: [{ upTo: null, outcome: 'ok', message: '' }] }); render(); }
+  function addMaterial() {
+    const ids = new Set(draft.materials.map(m => m.id));
+    let n = draft.materials.length + 1;
+    while (ids.has('mat' + n)) n++;
+    draft.materials.push({ id: 'mat' + n, label: 'חומר חדש', emoji: '🏠', baseFlagClass: 'ok', baseAction: null, geometry: 'flat', messages: { flagMsg: '', escalateNote: '', stopReason: '', stopScript: '' }, sizeRules: [{ upTo: null, outcome: 'ok', message: '' }] });
+    render();
+  }
   function delMaterial(i) { draft.materials.splice(i, 1); render(); }
 
   function showErrors(errs) {

@@ -20,9 +20,12 @@ function validateRoofConfig(cfg) {
   const seen = new Set();
   mats.forEach((m, i) => {
     const tag = m && m.label ? m.label : `#${i + 1}`;
-    if (!m.id || !String(m.id).trim()) errors.push(`חומר ${tag}: מזהה (id) חסר`);
-    else if (seen.has(m.id)) errors.push(`מזהה חומר כפול: ${m.id} (חייב להיות ייחודי)`);
-    seen.add(m.id);
+    if (!m.id || !String(m.id).trim()) {
+      errors.push(`חומר ${tag}: מזהה (id) חסר`);
+    } else {
+      if (seen.has(m.id)) errors.push(`מזהה חומר כפול: ${m.id} (חייב להיות ייחודי)`);
+      seen.add(m.id);
+    }
     if (!m.label || !String(m.label).trim()) errors.push(`חומר ${tag}: שם חסר`);
     if (VALID_ACTIONS.indexOf(m.baseAction === undefined ? null : m.baseAction) === -1)
       errors.push(`חומר ${tag}: פעולת בסיס לא חוקית`);
