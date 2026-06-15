@@ -132,11 +132,29 @@
     </div>
   </div>
 
+  <!-- ===== PERSISTENT 3D HOUSE DOCK (bottom-right, large) ===== -->
+  <div id="sim-dock" class="sim-dock">
+    <div class="dock-head">
+      <span class="dock-title"><span class="led led-cyan"></span>סימולציית בית · 3D</span>
+      <button class="dock-toggle" id="sim-dock-toggle" onclick="toggleSimDock()" title="כווץ / הרחב">▾</button>
+    </div>
+    <div class="dock-body">
+      <div class="sim-dock-stage">
+        <span class="corner tl"></span><span class="corner tr"></span>
+        <span class="corner bl"></span><span class="corner br"></span>
+        <canvas id="sim-dock-canvas" class="sim-dock-canvas"></canvas>
+        <div id="sim-dock-msg" class="sim-dock-msg"></div>
+      </div>
+      <div class="sim-dock-hint">↻ גרור לסיבוב · גלגלת לזום</div>
+    </div>
+  </div>
+
   <!-- ===== MANAGER SETTINGS MODAL HOST ===== -->
   <div id="settings-modal" class="settings-modal" aria-hidden="true"></div>
 
   <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="settlement-coords.js"></script>
   <script src="globe.js"></script>
   <script src="compass.js"></script>
   <script src="sim-state.js"></script>
