@@ -65,14 +65,21 @@ const VoltaSim = (() => {
     const ro = (typeof ResizeObserver !== 'undefined') ? new ResizeObserver(resize) : null;
     if (ro) ro.observe(canvas);
 
-    let raf = 0, spin = 0;
+    let raf = 0, spin = 0, active = true;
     function loop() {
+      if (!active) { raf = 0; return; }
       if (controls) controls.update();
       else { spin += 0.0032; camera.position.set(Math.sin(spin) * 22, 13, Math.cos(spin) * 22); camera.lookAt(0, 2.5, 0); }
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
     }
     raf = requestAnimationFrame(loop);
+
+    // Pause/resume the render loop (so a hidden mini-preview costs no GPU).
+    function setActive(on) {
+      if (on) { if (!active) { active = true; if (!raf) raf = requestAnimationFrame(loop); } }
+      else { active = false; }
+    }
 
     function clearDynamic() {
       scene.remove(dynamic);
@@ -102,7 +109,7 @@ const VoltaSim = (() => {
       renderer.dispose();
     }
 
-    return { update: update, dispose: dispose, resize: resize };
+    return { update: update, dispose: dispose, resize: resize, setActive: setActive };
   }
 
   // ---- geometry builders (module-private) ----

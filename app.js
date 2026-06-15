@@ -107,6 +107,7 @@ function renderWizard() {
 
   if (s.outcome) {
     container.innerHTML = renderWizardResult();
+    hideMiniSim(); // restore the globe so the satellite-deploy animation is visible
     if (window.VoltaGlobe && (s.outcome === 'go' || s.outcome === 'go-notes')) {
       window.VoltaGlobe.deploy();
     }
@@ -185,18 +186,20 @@ function ensureMiniSim() {
   }
   stage.classList.add('sim-on');
   if (!_miniSim) _miniSim = VoltaSim.mount(canvas, { interactive: false });
+  if (_miniSim) _miniSim.setActive(true);
   return _miniSim;
 }
 
 function hideMiniSim() {
   const stage = document.querySelector('.globe-stage');
   if (stage) stage.classList.remove('sim-on');
+  if (_miniSim) _miniSim.setActive(false); // restore globe + stop rendering off-screen
 }
 
-function updateMiniSim(liveSizes) {
+function updateMiniSim(liveSizes, liveAz) {
   const sim = ensureMiniSim();
   if (!sim) return;
-  sim.update(Wizard.getSimInputs(liveSizes));
+  sim.update(Wizard.getSimInputs(liveSizes, liveAz));
 }
 
 let _fullSim = null;
@@ -251,6 +254,7 @@ function updateCompassReadout(a) {
       : '☀ ' + a.dir + ' · תפוקה ~' + a.yield + '% — תנוחה ' + a.quality + ' לייצור סולארי';
   }
   highlightDirBtn(a.az);
+  updateMiniSim(null, a.az); // live: rotate the house/sun as the compass turns
 }
 
 function wizardOrientationConfirm() {

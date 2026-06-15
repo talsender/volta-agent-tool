@@ -382,7 +382,7 @@ const Wizard = (() => {
 
   // Current inputs for the 3D sim. Sizes come from the confirmed material-sizes
   // answer; pass liveSizes (from the DOM) to preview before confirming.
-  function getSimInputs(liveSizes) {
+  function getSimInputs(liveSizes, liveAz) {
     const materials = liveSizes && liveSizes.length
       ? liveSizes
       : (state.materialSizes && state.materialSizes.length
@@ -390,7 +390,8 @@ const Wizard = (() => {
           : state.selectedRoofTypes.map(t => ({ id: t.value, size: 0 })));
     return {
       materials: materials.map(m => ({ id: m.materialId || m.id, size: m.size })),
-      azimuth: (typeof state.orientationAz === 'number') ? state.orientationAz : 180,
+      azimuth: (typeof liveAz === 'number') ? liveAz
+        : (typeof state.orientationAz === 'number') ? state.orientationAz : 180,
       shading: state.shading || 'none',
       propertyType: state.propertyType || 'private',
     };
