@@ -776,3 +776,14 @@ input[type=range]::-webkit-slider-thumb {
 .msize-verdict.ok   { background: rgba(61,240,138,0.1); color: var(--green); border-color: rgba(61,240,138,0.35); }
 .msize-verdict.warn { background: rgba(255,178,74,0.1); color: var(--amber-br); border-color: rgba(255,178,74,0.35); }
 .msize-verdict.bad  { background: rgba(255,93,108,0.1); color: var(--red); border-color: rgba(255,93,108,0.35); }
+
+/* ===================== HOUSE SIM (side mini + full) ===================== */
+.sim-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+.globe-stage.sim-on .sim-canvas { display: block; }
+.globe-stage.sim-on .globe-canvas,
+.globe-stage.sim-on #target-hud { display: none; }
+.sim-full { position: relative; width: 100%; height: 340px; border: 1px solid var(--line-strong);
+  border-radius: 12px; overflow: hidden; background: radial-gradient(circle at 50% 40%, rgba(20,40,70,0.5), rgba(4,7,15,0.3) 70%); margin: 14px 0; }
+.sim-full canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sim-tag { position: absolute; top: 8px; right: 10px; z-index: 2; font-family: var(--mono);
+  font-size: 10px; letter-spacing: 0.18em; color: var(--cyan); opacity: 0.85; }

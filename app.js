@@ -153,6 +153,44 @@ function renderWizard() {
   if (q && q.type === 'material-sizes') {
     setTimeout(() => updateMaterialSizes(), 0);
   }
+  if (q && ROOF_STEPS.has(q.id)) {
+    setTimeout(() => updateMiniSim(q.id === 'material-sizes' ? readMaterialSizes() : null), 0);
+  } else {
+    hideMiniSim();
+  }
+}
+
+// ============================================================
+// HOUSE SIM (side-panel mini preview)
+// ============================================================
+let _miniSim = null;
+const ROOF_STEPS = new Set(['roof-type', 'tiles-age', 'material-sizes', 'roof-orientation', 'shading']);
+
+function ensureMiniSim() {
+  if (!window.VoltaSim || !VoltaSim.available()) return null;
+  const stage = document.querySelector('.globe-stage');
+  if (!stage) return null;
+  let canvas = document.getElementById('sim-canvas');
+  if (!canvas) {
+    canvas = document.createElement('canvas');
+    canvas.id = 'sim-canvas';
+    canvas.className = 'sim-canvas';
+    stage.appendChild(canvas);
+  }
+  stage.classList.add('sim-on');
+  if (!_miniSim) _miniSim = VoltaSim.mount(canvas, { interactive: false });
+  return _miniSim;
+}
+
+function hideMiniSim() {
+  const stage = document.querySelector('.globe-stage');
+  if (stage) stage.classList.remove('sim-on');
+}
+
+function updateMiniSim(liveSizes) {
+  const sim = ensureMiniSim();
+  if (!sim) return;
+  sim.update(Wizard.getSimInputs(liveSizes));
 }
 
 // ============================================================
@@ -353,6 +391,7 @@ function updateMaterialSizes() {
   if (sum >= good) { v.className = 'msize-verdict ok'; v.textContent = `✅ ${sum} מ"ר — שטח מתאים`; }
   else if (sum >= border) { v.className = 'msize-verdict warn'; v.textContent = `⚠️ ${sum} מ"ר — גבולי, המומחה יאשר`; }
   else { v.className = 'msize-verdict bad'; v.textContent = `❌ ${sum} מ"ר — קטן מדי (מינימום ${border} מ"ר)`; }
+  updateMiniSim(readMaterialSizes());
 }
 
 function materialSizesConfirm() {
