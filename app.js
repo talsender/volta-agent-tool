@@ -110,6 +110,9 @@ function renderWizard() {
     if (window.VoltaGlobe && (s.outcome === 'go' || s.outcome === 'go-notes')) {
       window.VoltaGlobe.deploy();
     }
+    if (s.outcome === 'go' || s.outcome === 'go-notes') {
+      setTimeout(() => mountFullSim(), 0);
+    }
     return;
   }
 
@@ -191,6 +194,19 @@ function updateMiniSim(liveSizes) {
   const sim = ensureMiniSim();
   if (!sim) return;
   sim.update(Wizard.getSimInputs(liveSizes));
+}
+
+let _fullSim = null;
+function mountFullSim() {
+  const canvas = document.getElementById('sim-full-canvas');
+  if (!canvas || !window.VoltaSim || !VoltaSim.available()) {
+    const box = canvas && canvas.closest('.sim-full');
+    if (box) box.style.display = 'none'; // graceful fallback: no Three.js → hide block
+    return;
+  }
+  if (_fullSim) _fullSim.dispose();
+  _fullSim = VoltaSim.mount(canvas, { interactive: true });
+  _fullSim.update(Wizard.getSimInputs());
 }
 
 // ============================================================
@@ -432,6 +448,7 @@ function renderWizardResult() {
     return `<div class="wizard-result go">
       <div class="wr-header"><div class="wr-icon">✅</div><div class="wr-title">ניתן לתאם שיחת מומחה</div></div>
       <div class="answers-recap">${recap}</div>
+      <div class="sim-full"><span class="sim-tag">תצוגת תכנון · 3D</span><canvas id="sim-full-canvas"></canvas></div>
       <div class="btn-row">
         <button class="btn primary">📅 תאם שיחת מומחה</button>
         <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
@@ -445,6 +462,7 @@ function renderWizardResult() {
       <div class="wr-header"><div class="wr-icon">⚠️</div><div class="wr-title">ניתן לקדם — שים לב להערות</div></div>
       <div class="answers-recap">${recap}</div>
       ${flags}
+      <div class="sim-full"><span class="sim-tag">תצוגת תכנון · 3D</span><canvas id="sim-full-canvas"></canvas></div>
       <div class="btn-row">
         <button class="btn primary">📅 תאם שיחת מומחה</button>
         <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
