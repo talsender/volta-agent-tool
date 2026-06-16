@@ -164,6 +164,7 @@
     }
 
     let spin = 0, last = performance.now();
+    let viewZoom = 1, panX = 0, panY = 0;   // cinematic fly-to (zoom + recenter)
     function frame(now) {
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
 
@@ -177,6 +178,26 @@
       }
       if (target) target.t += dt;
       ctx.clearRect(0, 0, W, H);
+
+      // --- cinematic fly-to: phase 1 frame Israel, phase 2 zoom into the settlement ---
+      let zTarget = 1, desPanX = 0, desPanY = 0;
+      if (target) {
+        const t = target.t;
+        let mix;
+        if (t < 0.9) { zTarget = 1 + (t / 0.9) * 0.6; mix = 0; }              // → 1.6 : frame Israel
+        else { const u = Math.min(1, (t - 0.9) / 1.1); zTarget = 1.6 + u * 1.7; mix = u; } // → 3.3 : settlement
+        const tp = target.pt || site;
+        const pivot = { x: site.x + (tp.x - site.x) * mix, y: site.y + (tp.y - site.y) * mix, z: site.z + (tp.z - site.z) * mix };
+        const pv = rot(pivot, spin);
+        desPanX = -(pv.x * R);          // recenter the pivot horizontally
+        desPanY = +(pv.y * R);          // and vertically
+      }
+      viewZoom += (zTarget - viewZoom) * Math.min(1, dt * 2.4);
+      panX += (desPanX - panX) * Math.min(1, dt * 2.4);
+      panY += (desPanY - panY) * Math.min(1, dt * 2.4);
+      ctx.save();
+      ctx.translate(panX * viewZoom, panY * viewZoom);
+      ctx.translate(cx, cy); ctx.scale(viewZoom, viewZoom); ctx.translate(-cx, -cy);
 
       // --- atmospheric halo ---
       const halo = ctx.createRadialGradient(cx, cy, R * 0.6, cx, cy, R * 1.9);
@@ -281,6 +302,7 @@
         }
       }
 
+      ctx.restore();
       requestAnimationFrame(frame);
     }
 
