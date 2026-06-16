@@ -176,7 +176,12 @@ function initSimDock() {
 }
 
 function updateSimDock(liveSizes, liveAz) {
-  if (_dockSim) _dockSim.update(Wizard.getSimInputs(liveSizes, liveAz));
+  if (!_dockSim) return;
+  const inputs = Wizard.getSimInputs(liveSizes, liveAz);
+  const cfg = (typeof RoofStore !== 'undefined') ? RoofStore.get() : { materials: [] };
+  // getSimInputs returns raw inputs; buildSimState turns them into the render-ready
+  // state (house/parts/sun/obstacles) that VoltaSim.update expects.
+  _dockSim.update(buildSimState(inputs, cfg));
 }
 
 function toggleSimDock() {
