@@ -3,6 +3,17 @@ const CONFIG = {
   ROOF_SIZE_GOOD: 70,
   ROOF_SIZE_BORDERLINE: 60,
   ROOF_AGE_WARNING: 25,
+
+  // הדבק כאן את ערכי ה-config מפרויקט ה-Firebase שלך.
+  // ניהול בקשות החריגה והנציגים נשמר ב-Firestore.
+  FIREBASE_CONFIG: {
+    apiKey: 'AIzaSyAgbJWir2bpJyn3iBGV9VcuF0AZrBnGxkw',
+    authDomain: 'volta-city.firebaseapp.com',
+    projectId: 'volta-city',
+    storageBucket: 'volta-city.firebasestorage.app',
+    messagingSenderId: '87123573134',
+    appId: '1:87123573134:web:43703b06c81c6584e50cdf',
+  },
 };
 
 // Single source of truth for roof eligibility. Manager-editable in a later

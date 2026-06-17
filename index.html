@@ -18,6 +18,19 @@
   <div class="vignette" aria-hidden="true"></div>
   <div class="grain" aria-hidden="true"></div>
 
+  <!-- ===== AGENT LOGIN GATE ===== -->
+  <div id="login-gate" class="login-gate hidden">
+    <div class="login-card">
+      <div class="login-title">VOLTA · כניסת נציג</div>
+      <div class="login-sub">הזן את קוד הנציג האישי שלך</div>
+      <input id="login-code" class="login-input" type="text" inputmode="numeric"
+        placeholder="קוד נציג" autocomplete="off">
+      <button id="login-btn" class="login-btn">כניסה</button>
+      <div id="login-error" class="login-error"></div>
+      <button id="manager-access" class="manager-access">כניסת מנהל</button>
+    </div>
+  </div>
+
   <div id="app">
     <!-- ===== TOP TELEMETRY BAR ===== -->
     <header class="app-header">
@@ -35,6 +48,11 @@
         <div class="tele-item"><span class="led led-green"></span><span class="tele-k">SAT-LINK</span><span class="tele-v">ONLINE</span></div>
         <div class="tele-item"><span class="tele-k">UTC</span><span class="tele-v" id="sys-time">--:--:--</span></div>
         <div class="tele-item tele-coord"><span class="tele-k">GRID</span><span class="tele-v" id="sys-coord">31.0°N · 34.8°E</span></div>
+      </div>
+      <div class="agent-bar">
+        <span class="agent-name" id="agent-name">—</span>
+        <button class="agent-link" id="my-requests-btn">📋 הבקשות שלי</button>
+        <button class="agent-link" id="logout-btn">יציאה</button>
       </div>
     </header>
 
@@ -132,6 +150,57 @@
     </div>
   </div>
 
+  <!-- ===== EXCEPTION REQUEST MODAL ===== -->
+  <div id="req-modal" class="req-modal hidden">
+    <div class="req-card">
+      <div class="req-title">בקשת חריגה ממנהל</div>
+      <div class="req-context" id="req-context"></div>
+      <div class="req-status-select hidden" id="req-status-select">
+        <div class="req-status-label">הבקשה שלי:</div>
+        <div class="req-status-btns">
+          <button type="button" class="req-status-btn" data-status="מתקינים" id="req-status-yes">✅ מתקינים</button>
+          <button type="button" class="req-status-btn" data-status="לא מתקינים" id="req-status-no">❌ לא מתקינים</button>
+        </div>
+      </div>
+      <textarea id="req-reason" class="req-reason" rows="4"
+        placeholder="נמק מדוע אתה מבקש חריגה..."></textarea>
+      <div id="req-error" class="req-error"></div>
+      <div class="req-actions">
+        <button id="req-send" class="btn primary">שלח בקשה</button>
+        <button id="req-cancel" class="btn reset">ביטול</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MY REQUESTS ===== -->
+  <div id="my-req-modal" class="req-modal hidden">
+    <div class="req-card wide">
+      <div class="req-title">הבקשות שלי</div>
+      <div id="my-req-list" class="my-req-list"></div>
+      <div class="req-actions">
+        <button id="my-req-close" class="btn reset">סגור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MANAGER PANEL ===== -->
+  <div id="admin-modal" class="req-modal hidden">
+    <div class="req-card wide">
+      <div class="req-title">פאנל מנהל</div>
+      <nav class="admin-tabs">
+        <button class="admin-tab active" data-atab="requests">בקשות</button>
+        <button class="admin-tab" data-atab="agents">נציגים</button>
+        <button class="admin-tab" data-atab="roof">הגדרות גג</button>
+      </nav>
+      <div id="admin-requests" class="admin-pane"></div>
+      <div id="admin-agents" class="admin-pane hidden"></div>
+      <div id="admin-roof" class="admin-pane hidden"></div>
+      <div class="req-actions">
+        <button id="admin-close" class="btn reset">סגור</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== PERSISTENT 3D HOUSE DOCK (bottom-right, large) ===== -->
   <div id="sim-dock" class="sim-dock">
     <div class="dock-head">
@@ -155,6 +224,20 @@
   <!-- ===== MANAGER SETTINGS MODAL HOST ===== -->
   <div id="settings-modal" class="settings-modal" aria-hidden="true"></div>
 
+  <!-- Firebase SDK (modular) exposed as window.firebase for the data layer -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import {
+      getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
+      setDoc, getDocs, onSnapshot
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    window.firebase = {
+      initializeApp, getFirestore, collection, doc, addDoc, updateDoc,
+      deleteDoc, setDoc, getDocs, onSnapshot
+    };
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+
   <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="settlement-coords.js"></script>
@@ -163,11 +246,16 @@
   <script src="sim-state.js"></script>
   <script src="sim.js"></script>
   <script src="config.js"></script>
+  <script src="requests.js"></script>
+  <script src="auth.js"></script>
+  <script src="firebase.js"></script>
   <script src="roof-store.js"></script>
   <script src="settlements-data.js"></script>
   <script src="settlements.js"></script>
   <script src="wizard.js"></script>
+  <script src="admin.js"></script>
   <script src="app.js"></script>
+  <script src="settings.js"></script>
   <script src="settings.js"></script>
 </body>
 </html>
