@@ -24,16 +24,23 @@ const Requests = (() => {
     });
   }
 
-  function buildRequest({ type, agent, subject, reason, context }) {
+  // The status a settlement request may ask to switch to.
+  const REQUESTABLE_STATUSES = ['מתקינים', 'לא מתקינים'];
+
+  function buildRequest({ type, agent, subject, reason, context, requestedStatus }) {
     if (!agent || !agent.id) throw new Error('agent required');
     if (!reason || !reason.trim()) throw new Error('reason required');
     if (type !== 'settlement' && type !== 'roof') throw new Error('invalid type');
+    if (type === 'settlement' && !REQUESTABLE_STATUSES.includes(requestedStatus)) {
+      throw new Error('invalid requestedStatus');
+    }
     return {
       type,
       agentId: agent.id,
       agentName: agent.name || '',
       subject: subject || '',
       reason: reason.trim(),
+      requestedStatus: type === 'settlement' ? requestedStatus : null,
       context: context || {},
       status: 'pending',
       resolution: null,
@@ -57,15 +64,16 @@ const Requests = (() => {
   }
 
   // For permanent settlement approval, compute the override doc to write.
-  function overrideFromApproval(request, newStatus, managerName) {
+  // The new status is the one the agent requested (request.requestedStatus).
+  function overrideFromApproval(request, managerName) {
     if (request.type !== 'settlement') return null;
     return {
       key: normalizeName(request.subject),
-      value: { status: newStatus, note: request.reason, updatedBy: managerName || '', updatedAt: Date.now() },
+      value: { status: request.requestedStatus, note: request.reason, updatedBy: managerName || '', updatedAt: Date.now() },
     };
   }
 
-  return { normalizeName, mergeOverrides, buildRequest, decideRequest, overrideFromApproval };
+  return { normalizeName, mergeOverrides, buildRequest, decideRequest, overrideFromApproval, REQUESTABLE_STATUSES };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Requests;

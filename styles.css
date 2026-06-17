@@ -827,6 +827,21 @@ input[type=range]::-webkit-slider-thumb {
   color: var(--text); padding: 10px; font-size: 14px; resize: vertical; font-family: var(--sans); box-sizing: border-box; }
 .req-actions { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-start; flex-wrap: wrap; }
 
+/* Settlement request: 'מתקינים' / 'לא מתקינים' selector */
+.req-status-select { margin-bottom: 12px; }
+.req-status-select.hidden { display: none; }
+.req-status-label { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; letter-spacing: 0.05em; }
+.req-status-btns { display: flex; gap: 10px; }
+.req-status-btn { flex: 1; padding: 10px; border-radius: 9px; border: 1px solid var(--line-strong);
+  background: var(--void); color: var(--text); font-size: 14px; font-family: var(--sans); cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s; }
+.req-status-btn[data-status="מתקינים"].selected { border-color: var(--green);
+  box-shadow: 0 0 0 1px var(--green), 0 0 16px rgba(61,240,138,0.25); background: rgba(61,240,138,0.08); }
+.req-status-btn[data-status="לא מתקינים"].selected { border-color: var(--red);
+  box-shadow: 0 0 0 1px var(--red), 0 0 16px rgba(255,93,108,0.25); background: rgba(255,93,108,0.08); }
+.ar-requested { font-size: 12px; color: var(--text-dim); margin: 2px 0 4px; }
+.ar-requested b { color: var(--cyan-br); }
+
 /* My requests */
 .my-req-list { display: flex; flex-direction: column; gap: 10px; }
 .my-req-empty { color: var(--muted); font-size: 13px; padding: 16px; text-align: center; }

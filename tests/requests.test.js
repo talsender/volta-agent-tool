@@ -33,16 +33,36 @@ test('buildRequest בונה בקשת יישוב תקינה עם status pending',
   const req = Requests.buildRequest({
     type: 'settlement', agent, subject: 'דימונה',
     reason: ' יש לנו לקוח גדול ', context: { status: 'לא מתקינים' },
+    requestedStatus: 'מתקינים',
   });
   assert.strictEqual(req.type, 'settlement');
   assert.strictEqual(req.agentId, 'a1');
   assert.strictEqual(req.agentName, 'דני');
   assert.strictEqual(req.subject, 'דימונה');
   assert.strictEqual(req.reason, 'יש לנו לקוח גדול'); // trimmed
+  assert.strictEqual(req.requestedStatus, 'מתקינים');
   assert.deepStrictEqual(req.context, { status: 'לא מתקינים' });
   assert.strictEqual(req.status, 'pending');
   assert.strictEqual(req.resolution, null);
   assert.strictEqual(typeof req.createdAt, 'number');
+});
+
+test('buildRequest ליישוב זורק כשהסטטוס המבוקש חסר או לא חוקי', () => {
+  assert.throws(() => Requests.buildRequest({
+    type: 'settlement', agent: { id: 'a1' }, subject: 'דימונה', reason: 'סיבה',
+  }), /requestedStatus/);
+  assert.throws(() => Requests.buildRequest({
+    type: 'settlement', agent: { id: 'a1' }, subject: 'דימונה', reason: 'סיבה',
+    requestedStatus: 'אולי',
+  }), /requestedStatus/);
+});
+
+test('buildRequest לבקשת גג אינה דורשת סטטוס מבוקש', () => {
+  const req = Requests.buildRequest({
+    type: 'roof', agent: { id: 'a1' }, subject: 's', reason: 'סיבה',
+  });
+  assert.strictEqual(req.type, 'roof');
+  assert.strictEqual(req.requestedStatus, null);
 });
 
 test('buildRequest זורק כשחסר נימוק', () => {
@@ -80,13 +100,14 @@ test('decideRequest אישור קבוע', () => {
   assert.strictEqual(patch.resolution, 'permanent');
 });
 
-test('overrideFromApproval בונה override ליישוב בלבד', () => {
-  const req = { type: 'settlement', subject: 'מגדל העמק', reason: 'לקוח גדול' };
-  const ov = Requests.overrideFromApproval(req, 'לא מתקינים', 'מנהל');
+test('overrideFromApproval משתמש בסטטוס שהנציג ביקש', () => {
+  const req = { type: 'settlement', subject: 'מגדל העמק', reason: 'לקוח גדול',
+    requestedStatus: 'לא מתקינים' };
+  const ov = Requests.overrideFromApproval(req, 'מנהל');
   assert.strictEqual(ov.key, 'מגדל העמק');
   assert.strictEqual(ov.value.status, 'לא מתקינים');
   assert.strictEqual(ov.value.note, 'לקוח גדול');
   assert.strictEqual(ov.value.updatedBy, 'מנהל');
 
-  assert.strictEqual(Requests.overrideFromApproval({ type: 'roof' }, 'x', 'm'), null);
+  assert.strictEqual(Requests.overrideFromApproval({ type: 'roof' }, 'm'), null);
 });

@@ -560,12 +560,22 @@ function initAgentAuth() {
 let _pendingReq = null;
 
 function openRequestModal(type, subject, context) {
-  _pendingReq = { type, subject, context };
+  _pendingReq = { type, subject, context, requestedStatus: null };
   document.getElementById('req-context').textContent =
     (type === 'settlement' ? 'יישוב: ' : 'בדיקת גג: ') + subject;
   document.getElementById('req-reason').value = '';
   document.getElementById('req-error').textContent = '';
+  // The status selector ('מתקינים' / 'לא מתקינים') is only for settlement requests.
+  const statusSel = document.getElementById('req-status-select');
+  if (type === 'settlement') { statusSel.classList.remove('hidden'); setReqStatus(null); }
+  else { statusSel.classList.add('hidden'); }
   document.getElementById('req-modal').classList.remove('hidden');
+}
+function setReqStatus(status) {
+  if (_pendingReq) _pendingReq.requestedStatus = status;
+  document.querySelectorAll('#req-status-select .req-status-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.status === status);
+  });
 }
 function openSettlementRequest() {
   if (!_currentSettlement) return;
@@ -597,18 +607,24 @@ async function sendRequest() {
   try {
     const req = Requests.buildRequest({
       type: _pendingReq.type, agent, subject: _pendingReq.subject,
-      reason, context: _pendingReq.context,
+      reason, context: _pendingReq.context, requestedStatus: _pendingReq.requestedStatus,
     });
     await VoltaDB.addRequest(req);
     closeRequestModal();
     alert('הבקשה נשלחה למנהל ✓');
   } catch (e) {
-    errEl.textContent = (e && e.message === 'reason required') ? 'יש לכתוב נימוק' : 'שגיאה בשליחה';
+    const msg = e && e.message;
+    errEl.textContent = msg === 'reason required' ? 'יש לכתוב נימוק'
+      : msg === 'invalid requestedStatus' ? 'יש לבחור מתקינים או לא מתקינים'
+      : 'שגיאה בשליחה';
   }
 }
 function initRequestModal() {
   document.getElementById('req-send').addEventListener('click', sendRequest);
   document.getElementById('req-cancel').addEventListener('click', closeRequestModal);
+  document.querySelectorAll('#req-status-select .req-status-btn').forEach(b => {
+    b.addEventListener('click', () => setReqStatus(b.dataset.status));
+  });
 }
 
 // ============================================================
@@ -631,6 +647,8 @@ function renderMyRequests() {
       <div class="mr-head"><span class="mr-type">${r.type === 'roof' ? '🏠 גג' : '📍 יישוב'}</span>
         <span class="mr-status">${STATUS_LABEL[r.status] || r.status}${res}</span></div>
       <div class="mr-subject">${escHtml(r.subject || '')}</div>
+      ${r.type === 'settlement' && r.requestedStatus
+        ? `<div class="ar-requested">מבקש לשנות ל־ <b>${escHtml(r.requestedStatus)}</b></div>` : ''}
       <div class="mr-reason">${escHtml(r.reason || '')}</div>
       ${note}
     </div>`;

@@ -88,6 +88,8 @@ const Admin = (() => {
         <div class="ar-head"><span>${r.type === 'roof' ? '🏠 גג' : '📍 יישוב'}</span>
           <span class="ar-agent">${escHtml(r.agentName || '')}</span></div>
         <div class="ar-subject">${escHtml(r.subject || '')}</div>
+        ${r.type === 'settlement' && r.requestedStatus
+          ? `<div class="ar-requested">מבקש לשנות ל־ <b>${escHtml(r.requestedStatus)}</b></div>` : ''}
         <div class="ar-reason">${escHtml(r.reason || '')}</div>
         ${actions}
       </div>`;
@@ -99,18 +101,14 @@ const Admin = (() => {
   async function approve(id, resolution) {
     const req = _requests.find(r => r.id === id);
     if (!req) return;
-    let newStatus = null;
-    if (resolution === 'permanent' && req.type === 'settlement') {
-      newStatus = window.prompt('סטטוס חדש ליישוב (מתקינים / לא מתקינים / להתייעץ):', 'לא מתקינים');
-      if (newStatus == null) return;
-      newStatus = newStatus.trim();
-    } else if (resolution === 'permanent' && req.type === 'roof') {
+    if (resolution === 'permanent' && req.type === 'roof') {
       alert('אישור גג קבוע נרשם. החלת הכלל בפועל נעשית בפאנל הגדרות הגג.');
     }
     const note = window.prompt('הערה לנציג (אופציונלי):', '') || '';
     const patch = Requests.decideRequest(req, { action: 'approve', resolution, managerNote: note });
-    if (newStatus) {
-      const ov = Requests.overrideFromApproval(req, newStatus, 'מנהל');
+    // Permanent settlement approval applies the status the agent requested.
+    if (resolution === 'permanent' && req.type === 'settlement') {
+      const ov = Requests.overrideFromApproval(req, 'מנהל');
       if (ov) await VoltaDB.setOverride(ov.key, ov.value);
     }
     await VoltaDB.updateRequest(id, patch);

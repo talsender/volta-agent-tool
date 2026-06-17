@@ -155,6 +155,13 @@
     <div class="req-card">
       <div class="req-title">בקשת חריגה ממנהל</div>
       <div class="req-context" id="req-context"></div>
+      <div class="req-status-select hidden" id="req-status-select">
+        <div class="req-status-label">הבקשה שלי:</div>
+        <div class="req-status-btns">
+          <button type="button" class="req-status-btn" data-status="מתקינים" id="req-status-yes">✅ מתקינים</button>
+          <button type="button" class="req-status-btn" data-status="לא מתקינים" id="req-status-no">❌ לא מתקינים</button>
+        </div>
+      </div>
       <textarea id="req-reason" class="req-reason" rows="4"
         placeholder="נמק מדוע אתה מבקש חריגה..."></textarea>
       <div id="req-error" class="req-error"></div>
