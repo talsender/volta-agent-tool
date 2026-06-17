@@ -733,6 +733,56 @@ async function init() {
   if (typeof initWizard === 'function') initWizard();
   initDockCompass();
   initSimDock();
+  initKnowledgeBase();
+}
+
+// ============================================================
+// KNOWLEDGE BASE (field rules distilled from the technicians' group)
+// ============================================================
+function initKnowledgeBase() {
+  const input = document.getElementById('kb-input');
+  if (!input || !window.VOLTA_KB) return;
+  renderKnowledgeBase('');
+  input.addEventListener('input', () => renderKnowledgeBase(input.value));
+}
+
+function renderKnowledgeBase(query) {
+  const list = document.getElementById('kb-list');
+  if (!list) return;
+  const VERDICT = {
+    yes:     { cls:'yes',   badge:'✅ מתקינים' },
+    consult: { cls:'check', badge:'⚠️ להתיייעץ' },
+    no:      { cls:'no',    badge:'❌ לא מתקינים' },
+  };
+  const q = (query || '').trim().toLowerCase();
+  const items = window.VOLTA_KB.filter(e => {
+    if (!q) return true;
+    return (e.item + ' ' + e.note + ' ' + e.cat + ' ' + (e.keywords || '')).toLowerCase().includes(q);
+  });
+
+  if (!items.length) {
+    list.innerHTML = '<div class="kb-empty">לא נמצאו תוצאות. נסה מונח אחר, או פנה למומחה / מנהל.</div>';
+    return;
+  }
+
+  // group by category, preserving order of first appearance
+  const cats = [];
+  const byCat = {};
+  items.forEach(e => { if (!byCat[e.cat]) { byCat[e.cat] = []; cats.push(e.cat); } byCat[e.cat].push(e); });
+
+  list.innerHTML = cats.map(cat => `
+    <div class="kb-cat">${escHtml(cat)}</div>
+    ${byCat[cat].map(e => {
+      const v = VERDICT[e.verdict] || VERDICT.consult;
+      return `<div class="kb-item ${v.cls}">
+        <div class="kb-item-head">
+          <span class="kb-item-name">${escHtml(e.item)}</span>
+          <span class="kb-badge ${v.cls}">${v.badge}</span>
+        </div>
+        <div class="kb-note">${escHtml(e.note)}</div>
+      </div>`;
+    }).join('')}
+  `).join('');
 }
 
 document.addEventListener('DOMContentLoaded', init);

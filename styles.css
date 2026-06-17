@@ -1005,3 +1005,30 @@ input[type=range]::-webkit-slider-thumb {
 @media (max-width: 720px) {
   .agent-add, .agent-row.editing { grid-template-columns: 1fr 1fr; }
 }
+
+/* ===================== KNOWLEDGE BASE (Module 03) ===================== */
+.kb-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.kb-cat {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+  color: var(--cyan); margin: 14px 2px 4px; padding-bottom: 5px;
+  border-bottom: 1px solid var(--line); text-transform: uppercase;
+}
+.kb-cat:first-child { margin-top: 0; }
+.kb-item {
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-right: 3px solid var(--line-strong);
+  border-radius: 10px; padding: 11px 14px;
+}
+.kb-item.yes   { border-right-color: var(--green); }
+.kb-item.check { border-right-color: var(--amber); }
+.kb-item.no    { border-right-color: var(--red); }
+.kb-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
+.kb-item-name { font-weight: 700; font-size: 14px; color: var(--text); }
+.kb-badge {
+  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 12px; white-space: nowrap; flex-shrink: 0;
+}
+.kb-badge.yes   { background: rgba(61,240,138,0.14); color: var(--green); }
+.kb-badge.check { background: rgba(255,178,74,0.14); color: var(--amber-br); }
+.kb-badge.no    { background: rgba(255,93,108,0.14); color: var(--red); }
+.kb-note { font-size: 13px; color: var(--text-dim); line-height: 1.55; }
+.kb-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 24px; }
