@@ -44,15 +44,30 @@ const VoltaSim = (() => {
 
     let dynamic = new THREE.Group(); scene.add(dynamic);
 
-    let controls = null;
+    let controls = null, userMoved = false;
     if (opts.interactive && THREE.OrbitControls) {
       controls = new THREE.OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.target.set(0, 2.5, 0);
-      controls.minDistance = 9; controls.maxDistance = 46;
+      controls.minDistance = 4; controls.maxDistance = 90;
       controls.maxPolarAngle = Math.PI * 0.49;
+      controls.addEventListener('start', () => { userMoved = true; });
     } else {
       camera.lookAt(0, 2.5, 0);
+    }
+
+    // Frame the camera on the current house so it always fills the view.
+    function frameContent() {
+      const box = new THREE.Box3().setFromObject(dynamic);
+      if (box.isEmpty()) return;
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 6;
+      const dist = maxDim * 1.7 + 5;
+      camera.position.set(center.x + dist * 0.75, center.y + dist * 0.6, center.z + dist * 0.78);
+      camera.far = dist * 8; camera.updateProjectionMatrix();
+      if (controls) { controls.target.copy(center); controls.update(); }
+      else camera.lookAt(center);
     }
 
     function resize() {
@@ -98,7 +113,10 @@ const VoltaSim = (() => {
       sun.position.set(d.x * 40, Math.max(8, d.y * 40), d.z * 40);
       sun.target.position.set(0, 0, 0);
       sun.target.updateMatrixWorld();
+      if (!userMoved) frameContent(); // keep the house framed until the user orbits
     }
+
+    function recenter() { userMoved = false; frameContent(); }
 
     function dispose() {
       cancelAnimationFrame(raf);
@@ -108,7 +126,7 @@ const VoltaSim = (() => {
       renderer.dispose();
     }
 
-    return { update: update, dispose: dispose, resize: resize, setActive: setActive };
+    return { update: update, dispose: dispose, resize: resize, setActive: setActive, recenter: recenter };
   }
 
   // ---- geometry builders (module-private) ----

@@ -136,7 +136,10 @@
   <div id="sim-dock" class="sim-dock">
     <div class="dock-head">
       <span class="dock-title"><span class="led led-cyan"></span>סימולציית בית · 3D</span>
-      <button class="dock-toggle" id="sim-dock-toggle" onclick="toggleSimDock()" title="כווץ / הרחב">▾</button>
+      <span style="display:flex;gap:6px">
+        <button class="dock-toggle" onclick="recenterSim()" title="מרכז מחדש">⊕</button>
+        <button class="dock-toggle" id="sim-dock-toggle" onclick="toggleSimDock()" title="כווץ / הרחב">▾</button>
+      </span>
     </div>
     <div class="dock-body">
       <div class="sim-dock-stage">

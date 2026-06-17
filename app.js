@@ -184,6 +184,8 @@ function updateSimDock(liveSizes, liveAz) {
   _dockSim.update(buildSimState(inputs, cfg));
 }
 
+function recenterSim() { if (_dockSim) _dockSim.recenter(); }
+
 function toggleSimDock() {
   const d = document.getElementById('sim-dock');
   if (!d) return;
