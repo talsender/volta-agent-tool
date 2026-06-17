@@ -21,13 +21,15 @@
   <!-- ===== AGENT LOGIN GATE ===== -->
   <div id="login-gate" class="login-gate hidden">
     <div class="login-card">
-      <div class="login-title">VOLTA · כניסת נציג</div>
-      <div class="login-sub">הזן את קוד הנציג האישי שלך</div>
-      <input id="login-code" class="login-input" type="text" inputmode="numeric"
-        placeholder="קוד נציג" autocomplete="off">
+      <div class="login-title">VOLTA · כניסה</div>
+      <div class="login-sub">הזן אימייל וסיסמה</div>
+      <input id="login-email" class="login-input" type="email"
+        placeholder="אימייל" autocomplete="username">
+      <input id="login-password" class="login-input" type="password"
+        placeholder="סיסמה" autocomplete="current-password">
       <button id="login-btn" class="login-btn">כניסה</button>
       <div id="login-error" class="login-error"></div>
-      <button id="manager-access" class="manager-access">כניסת מנהל</button>
+      <button id="bootstrap-btn" class="manager-access hidden">אתחול ראשוני (יצירת מנהל)</button>
     </div>
   </div>
 
@@ -51,7 +53,9 @@
       </div>
       <div class="agent-bar">
         <span class="agent-name" id="agent-name">—</span>
+        <span class="agent-role-badge hidden" id="agent-role-badge"></span>
         <button class="agent-link" id="my-requests-btn">📋 הבקשות שלי</button>
+        <button class="agent-link hidden" id="admin-open-btn">🛠️ פאנל ניהול</button>
         <button class="agent-link" id="logout-btn">יציאה</button>
       </div>
     </header>

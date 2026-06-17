@@ -4,6 +4,9 @@ const Admin = (() => {
   let _requests = [];
   let _open = false;
   let _reqFilter = 'pending'; // 'pending' | 'all'
+  let _ctx = 'manager';       // 'lead' (requests only) | 'manager' (all tabs)
+  let _agentSearch = '';
+  let _editingId = null;
 
   function managerPassword() {
     // Prefer the live (manager-editable) password from RoofStore, so the unified
@@ -16,22 +19,52 @@ const Admin = (() => {
       || 'volta';
   }
 
-  function open() {
+  // roleCtx: 'lead' → requests tab only; 'manager' → all tabs.
+  function open(roleCtx) {
+    _ctx = roleCtx === 'manager' ? 'manager' : 'lead';
+    _editingId = null;
+    applyTabVisibility();
     document.getElementById('admin-modal').classList.remove('hidden');
     _open = true;
     renderRequests();
     renderAgents();
     renderRoof();
+    switchTab('requests');
   }
   function close() {
     document.getElementById('admin-modal').classList.add('hidden');
     _open = false;
   }
-  function promptLogin() {
-    const pw = window.prompt('סיסמת מנהל:');
+
+  // Open honoring the logged-in agent's role.
+  function openForCurrentAgent() {
+    const agent = Auth.getCurrentAgent();
+    if (!agent) return;
+    if (Auth.can(agent, 'manageAgents')) open('manager');
+    else if (Auth.can(agent, 'reviewRequests')) open('lead');
+    else alert('אין לך הרשאה לפאנל הניהול.');
+  }
+
+  // First-time setup: only when no agents exist, the bootstrap password opens
+  // the panel in manager mode so the first manager account can be created.
+  function bootstrap() {
+    const hasManager = _agents.some(a => a.role === 'manager' && a.active);
+    if (hasManager) { alert('כבר קיים מנהל פעיל — היכנס עם חשבון המנהל.'); return; }
+    const pw = window.prompt('סיסמת אתחול:');
     if (pw == null) return;
-    if (pw === managerPassword()) open();
+    if (pw === managerPassword()) open('manager');
     else alert('סיסמה שגויה');
+  }
+
+  function applyTabVisibility() {
+    const isManager = _ctx === 'manager';
+    const set = (atab, show) => {
+      const btn = document.querySelector('.admin-tab[data-atab="' + atab + '"]');
+      if (btn) btn.classList.toggle('hidden', !show);
+    };
+    set('requests', true);
+    set('agents', isManager);
+    set('roof', isManager);
   }
 
   function switchTab(name) {
@@ -123,61 +156,171 @@ const Admin = (() => {
   }
 
   // ---- agents tab ----
-  function renderAgents() {
-    const pane = document.getElementById('admin-agents');
-    const rows = _agents.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-      .map(a => `<div class="agent-row ${a.active ? '' : 'inactive'}">
-        <span class="ag-name">${escHtml(a.name || '')}</span>
-        <span class="ag-code">קוד: ${escHtml(a.code || '')}</span>
-        <span class="ag-state">${a.active ? 'פעיל' : 'מושבת'}</span>
-        <button class="btn secondary sm" onclick="Admin.toggleAgent('${a.id}', ${a.active ? 'false' : 'true'})">${a.active ? 'השבת' : 'הפעל'}</button>
-        <button class="btn vsd sm" onclick="Admin.removeAgent('${a.id}')">מחק</button>
-      </div>`).join('');
-    pane.innerHTML = `
-      <div class="agent-add">
-        <input id="new-agent-name" class="login-input sm" placeholder="שם נציג">
-        <input id="new-agent-code" class="login-input sm" placeholder="קוד">
-        <button class="btn primary sm" onclick="Admin.addAgent()">הוסף נציג</button>
-        <div id="agent-add-error" class="req-error"></div>
-      </div>
-      <div class="agent-list">${rows || '<div class="my-req-empty">אין נציגים.</div>'}</div>`;
+  function roleOptions(sel) {
+    return Auth.ROLES.map(r =>
+      `<option value="${r}"${r === sel ? ' selected' : ''}>${escHtml(Auth.roleLabel(r))}</option>`).join('');
+  }
+  function fmtDate(ts) {
+    try { return new Date(ts).toLocaleDateString('he-IL'); } catch (e) { return ''; }
   }
 
+  function renderAgents() {
+    const pane = document.getElementById('admin-agents');
+    if (!pane) return;
+    pane.innerHTML = `
+      <div class="agent-add">
+        <input id="new-agent-name" class="login-input sm" placeholder="שם">
+        <input id="new-agent-email" class="login-input sm" type="email" placeholder="אימייל">
+        <input id="new-agent-password" class="login-input sm" type="password" placeholder="סיסמה">
+        <input id="new-agent-phone" class="login-input sm" placeholder="טלפון (אופציונלי)">
+        <select id="new-agent-role" class="login-input sm">${roleOptions('agent')}</select>
+        <button class="btn primary sm" onclick="Admin.addAgent()">הוסף נציג</button>
+      </div>
+      <div id="agent-add-error" class="req-error"></div>
+      <input id="agent-search" class="login-input sm agent-search"
+        placeholder="🔍 חיפוש לפי שם / אימייל / טלפון" oninput="Admin.searchAgents(this.value)">
+      <div id="agent-list" class="agent-list"></div>`;
+    const se = document.getElementById('agent-search');
+    if (se) se.value = _agentSearch;
+    renderAgentList();
+  }
+
+  function renderAgentList() {
+    const host = document.getElementById('agent-list');
+    if (!host) return;
+    const q = _agentSearch.trim().toLowerCase();
+    let list = _agents.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (q) list = list.filter(a =>
+      (a.name || '').toLowerCase().includes(q) ||
+      (a.email || '').toLowerCase().includes(q) ||
+      (a.phone || '').includes(q));
+    host.innerHTML = list.length
+      ? list.map(a => _editingId === a.id ? editRowHtml(a) : viewRowHtml(a)).join('')
+      : '<div class="my-req-empty">אין נציגים.</div>';
+  }
+
+  function viewRowHtml(a) {
+    return `<div class="agent-row ${a.active ? '' : 'inactive'}">
+      <span class="ag-name">${escHtml(a.name || '')}</span>
+      <span class="role-badge role-${escHtml(a.role || 'agent')}">${escHtml(Auth.roleLabel(a.role))}</span>
+      <span class="ag-code">${escHtml(a.email || '')}</span>
+      <span class="ag-phone">${escHtml(a.phone || '')}</span>
+      <span class="ag-state">${a.active ? 'פעיל' : 'מושבת'}${a.lastLoginAt ? ' · כניסה ' + fmtDate(a.lastLoginAt) : ''}</span>
+      <span class="ag-actions">
+        <button class="btn secondary sm" onclick="Admin.startEdit('${a.id}')">ערוך</button>
+        <button class="btn secondary sm" onclick="Admin.toggleAgent('${a.id}')">${a.active ? 'השבת' : 'הפעל'}</button>
+        <button class="btn vsd sm" onclick="Admin.removeAgent('${a.id}')">מחק</button>
+      </span>
+    </div>`;
+  }
+
+  function editRowHtml(a) {
+    return `<div class="agent-row editing">
+      <input id="edit-name-${a.id}" class="login-input sm" value="${escHtml(a.name || '')}" placeholder="שם">
+      <input id="edit-email-${a.id}" class="login-input sm" type="email" value="${escHtml(a.email || '')}" placeholder="אימייל">
+      <input id="edit-password-${a.id}" class="login-input sm" type="password" placeholder="סיסמה חדשה (ריק = ללא שינוי)">
+      <input id="edit-phone-${a.id}" class="login-input sm" value="${escHtml(a.phone || '')}" placeholder="טלפון">
+      <select id="edit-role-${a.id}" class="login-input sm">${roleOptions(a.role)}</select>
+      <span class="ag-actions">
+        <button class="btn primary sm" onclick="Admin.saveEdit('${a.id}')">שמור</button>
+        <button class="btn reset sm" onclick="Admin.cancelEdit()">ביטול</button>
+      </span>
+      <div id="edit-error-${a.id}" class="req-error"></div>
+    </div>`;
+  }
+
+  function searchAgents(v) { _agentSearch = v; renderAgentList(); }
+  function startEdit(id) { _editingId = id; renderAgentList(); }
+  function cancelEdit() { _editingId = null; renderAgentList(); }
+
   async function addAgent() {
-    const name = document.getElementById('new-agent-name').value.trim();
-    const code = document.getElementById('new-agent-code').value.trim();
+    const fields = {
+      name: document.getElementById('new-agent-name').value.trim(),
+      email: document.getElementById('new-agent-email').value.trim(),
+      password: document.getElementById('new-agent-password').value,
+      phone: document.getElementById('new-agent-phone').value.trim(),
+      role: document.getElementById('new-agent-role').value,
+    };
     const err = document.getElementById('agent-add-error');
-    if (!name || !code) { err.textContent = 'שם וקוד חובה'; return; }
-    if (_agents.some(a => a.code === code)) { err.textContent = 'קוד כבר קיים'; return; }
-    await VoltaDB.addAgent({ name, code, active: true, createdAt: Date.now() });
+    if (!fields.password) { err.textContent = 'סיסמה חובה'; return; }
+    const problem = Auth.validateAgentFields(fields, _agents);
+    if (problem) { err.textContent = problem; return; }
+    err.textContent = '';
+    await VoltaDB.addAgent({
+      name: fields.name, email: fields.email.toLowerCase(), password: fields.password,
+      phone: fields.phone, role: fields.role, active: true, createdAt: Date.now(), lastLoginAt: null,
+    });
+    ['new-agent-name', 'new-agent-email', 'new-agent-password', 'new-agent-phone'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
   }
-  async function toggleAgent(id, active) {
-    await VoltaDB.updateAgent(id, { active });
+
+  async function saveEdit(id) {
+    const agent = _agents.find(a => a.id === id);
+    if (!agent) return;
+    const fields = {
+      name: document.getElementById('edit-name-' + id).value.trim(),
+      email: document.getElementById('edit-email-' + id).value.trim(),
+      password: document.getElementById('edit-password-' + id).value,
+      phone: document.getElementById('edit-phone-' + id).value.trim(),
+      role: document.getElementById('edit-role-' + id).value,
+    };
+    const err = document.getElementById('edit-error-' + id);
+    const problem = Auth.validateAgentFields(fields, _agents, id);
+    if (problem) { if (err) err.textContent = problem; return; }
+    // Guard: don't demote the last active manager away from 'manager'.
+    if (agent.role === 'manager' && fields.role !== 'manager' && Auth.isLastActiveManager(_agents, id)) {
+      if (err) err.textContent = 'לא ניתן לשנות תפקיד של המנהל הפעיל האחרון';
+      return;
+    }
+    const patch = { name: fields.name, email: fields.email.toLowerCase(), phone: fields.phone, role: fields.role };
+    if (fields.password) patch.password = fields.password; // empty = keep existing
+    _editingId = null;
+    await VoltaDB.updateAgent(id, patch);
   }
+
+  async function toggleAgent(id) {
+    const agent = _agents.find(a => a.id === id);
+    if (!agent) return;
+    if (agent.active && Auth.isLastActiveManager(_agents, id)) {
+      alert('לא ניתן להשבית את המנהל הפעיל האחרון.');
+      return;
+    }
+    await VoltaDB.updateAgent(id, { active: !agent.active });
+  }
+
   async function removeAgent(id) {
+    if (Auth.isLastActiveManager(_agents, id)) {
+      alert('לא ניתן למחוק את המנהל הפעיל האחרון.');
+      return;
+    }
     if (!window.confirm('למחוק את הנציג? (עדיף להשבית כדי לשמור היסטוריית בקשות)')) return;
+    if (_editingId === id) _editingId = null;
     await VoltaDB.deleteAgent(id);
   }
 
   function init() {
+    // Double-click the logo opens the panel for the logged-in lead/manager.
+    // (Login-gate bootstrap + header button are wired in app.js.)
     const logo = document.querySelector('.brand');
-    if (logo) logo.addEventListener('dblclick', promptLogin);
-    // Reachable from the login gate too, so a manager can bootstrap agents
-    // before anyone is able to log in.
-    const mgrBtn = document.getElementById('manager-access');
-    if (mgrBtn) mgrBtn.addEventListener('click', promptLogin);
+    if (logo) logo.addEventListener('dblclick', openForCurrentAgent);
     document.getElementById('admin-close').addEventListener('click', close);
     document.querySelectorAll('.admin-tab').forEach(t =>
       t.addEventListener('click', () => switchTab(t.dataset.atab)));
 
-    VoltaDB.subscribeAgents(list => { _agents = list; if (_open) renderAgents(); });
+    VoltaDB.subscribeAgents(list => {
+      _agents = list;
+      // Refresh only the list (keeps the add-form's typed values intact).
+      if (_open && _ctx === 'manager') renderAgentList();
+    });
     VoltaDB.subscribeRequests(list => { _requests = list; if (_open) renderRequests(); });
   }
 
   return {
     init,
+    openForCurrentAgent, bootstrap,
     filterReq, approve, reject,
-    addAgent, toggleAgent, removeAgent,
+    addAgent, saveEdit, toggleAgent, removeAgent, startEdit, cancelEdit, searchAgents,
     openRoofSettings,
   };
 })();

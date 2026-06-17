@@ -526,21 +526,39 @@ function hideLoginGate() {
 function renderAgentBar() {
   const agent = Auth.getCurrentAgent();
   document.getElementById('agent-name').textContent = agent ? '👤 ' + agent.name : '—';
+  const badge = document.getElementById('agent-role-badge');
+  badge.textContent = agent ? Auth.roleLabel(agent.role) : '';
+  badge.classList.toggle('hidden', !agent);
+  // Only lead/manager see the management panel entry.
+  const canReview = !!(agent && Auth.can(agent, 'reviewRequests'));
+  document.getElementById('admin-open-btn').classList.toggle('hidden', !canReview);
 }
-function attemptLogin() {
-  const code = document.getElementById('login-code').value;
-  const agent = Auth.findAgentByCode(_agents, code);
+async function attemptLogin() {
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
-  if (!agent) { errEl.textContent = 'קוד שגוי או נציג לא פעיל'; return; }
+  const agent = Auth.findAgentByCredentials(_agents, email, password);
+  if (!agent) { errEl.textContent = 'אימייל או סיסמה שגויים, או חשבון מושבת'; return; }
   Auth.setCurrentAgent(agent);
   errEl.textContent = '';
-  document.getElementById('login-code').value = '';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
   hideLoginGate();
   renderAgentBar();
+  // Best-effort: record last login; never block the UI on failure.
+  if (VoltaDB.ready()) { try { await VoltaDB.updateAgent(agent.id, { lastLoginAt: Date.now() }); } catch (e) {} }
+}
+function refreshBootstrapVisibility() {
+  // Offer bootstrap whenever there is no active manager yet (covers first-time
+  // setup and migration from older agent records that have no role/manager).
+  const btn = document.getElementById('bootstrap-btn');
+  if (!btn) return;
+  const hasManager = _agents.some(a => a.role === 'manager' && a.active);
+  btn.classList.toggle('hidden', hasManager);
 }
 function initAgentAuth() {
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
-  document.getElementById('login-code').addEventListener('keydown', e => {
+  document.getElementById('login-password').addEventListener('keydown', e => {
     if (e.key === 'Enter') attemptLogin();
   });
   document.getElementById('logout-btn').addEventListener('click', () => {
@@ -548,8 +566,14 @@ function initAgentAuth() {
     renderAgentBar();
     showLoginGate();
   });
-  // Live agents list — used to validate login codes.
-  VoltaDB.subscribeAgents(list => { _agents = list; });
+  document.getElementById('admin-open-btn').addEventListener('click', () => {
+    if (window.Admin) Admin.openForCurrentAgent();
+  });
+  document.getElementById('bootstrap-btn').addEventListener('click', () => {
+    if (window.Admin) Admin.bootstrap();
+  });
+  // Live agents list — used to validate logins + toggle the bootstrap button.
+  VoltaDB.subscribeAgents(list => { _agents = list; refreshBootstrapVisibility(); });
   if (Auth.getCurrentAgent()) { hideLoginGate(); renderAgentBar(); }
   else { showLoginGate(); }
 }
