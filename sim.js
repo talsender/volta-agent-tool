@@ -44,6 +44,10 @@ const VoltaSim = (() => {
 
     let dynamic = new THREE.Group(); scene.add(dynamic);
 
+    // Editor: overrides persist user-dragged positions across rebuilds;
+    // draggables is rebuilt each update() (it references current meshes).
+    const editor = { overrides: {}, draggables: [] };
+
     let controls = null, userMoved = false;
     if (opts.interactive && THREE.OrbitControls) {
       controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -106,9 +110,10 @@ const VoltaSim = (() => {
 
     function update(simState) {
       clearDynamic();
+      editor.draggables = []; // meshes are recreated below
       if (!simState) return;
-      buildHouse(dynamic, simState);
-      buildObstacles(dynamic, simState);
+      buildHouse(dynamic, simState, editor);
+      buildObstacles(dynamic, simState, editor);
       const d = simState.sun.dir;
       sun.position.set(d.x * 40, Math.max(8, d.y * 40), d.z * 40);
       sun.target.position.set(0, 0, 0);
@@ -117,20 +122,77 @@ const VoltaSim = (() => {
     }
 
     function recenter() { userMoved = false; frameContent(); }
+    function resetLayout() { editor.overrides = {}; }
+
+    // ---- drag-to-move editor (move objects on the ground; shadows update live) ----
+    const raycaster = new THREE.Raycaster();
+    const ptr = new THREE.Vector2();
+    const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const hitPt = new THREE.Vector3();
+    let dragging = null;
+
+    function pointerNdc(e) {
+      const r = canvas.getBoundingClientRect();
+      ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+      ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+    }
+    function findDraggable(o) { while (o) { if (o.userData && o.userData.drag) return o; o = o.parent; } return null; }
+
+    function onDown(e) {
+      pointerNdc(e);
+      raycaster.setFromCamera(ptr, camera);
+      const hits = raycaster.intersectObjects(editor.draggables, true);
+      if (hits.length) {
+        dragging = findDraggable(hits[0].object);
+        if (dragging) {
+          if (controls) controls.enabled = false;
+          canvas.style.cursor = 'grabbing';
+          e.preventDefault();
+        }
+      }
+    }
+    function onMove(e) {
+      if (!dragging) return;
+      pointerNdc(e);
+      raycaster.setFromCamera(ptr, camera);
+      if (raycaster.ray.intersectPlane(dragPlane, hitPt)) {
+        const x = Math.max(-32, Math.min(32, hitPt.x));
+        const z = Math.max(-32, Math.min(32, hitPt.z));
+        dragging.position.x = x; dragging.position.z = z;
+        editor.overrides[dragging.userData.drag.key] = { x: x, z: z };
+      }
+      e.preventDefault();
+    }
+    function onUp() {
+      if (dragging) { dragging = null; if (controls) controls.enabled = true; canvas.style.cursor = 'grab'; }
+    }
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
 
     function dispose() {
       cancelAnimationFrame(raf);
       if (ro) ro.disconnect();
       if (controls) controls.dispose();
+      window.removeEventListener('pointerup', onUp);
       clearDynamic();
       renderer.dispose();
     }
 
-    return { update: update, dispose: dispose, resize: resize, setActive: setActive, recenter: recenter };
+    return { update: update, dispose: dispose, resize: resize, setActive: setActive, recenter: recenter, resetLayout: resetLayout };
   }
 
   // ---- geometry builders (module-private) ----
-  function buildHouse(group, s) {
+  // Register obj as draggable: apply any saved position override, tag it, and
+  // add it to the editor's pick list. defaultX/Z used when no override exists.
+  function applyDraggable(obj, key, editor, defaultX, defaultZ) {
+    obj.userData.drag = { key: key };
+    const ov = editor && editor.overrides[key];
+    obj.position.set(ov ? ov.x : defaultX, 0, ov ? ov.z : defaultZ);
+    if (editor) editor.draggables.push(obj);
+  }
+
+  function buildHouse(group, s, editor) {
     const side = s.house.footprint;       // width (x)
     const depth = side * 0.7;             // z
     const storyH = 3;
@@ -147,15 +209,22 @@ const VoltaSim = (() => {
     let x = -side / 2;
     parts.forEach(part => {
       const w = side * (part.areaShare || (1 / parts.length));
-      makeRoofPart(group, part.geometry, x + w / 2, Math.max(0.5, w - 0.1), depth, wallH);
+      makeRoofPart(group, part.geometry, x + w / 2, Math.max(0.5, w - 0.1), depth, wallH, editor, part.id);
       x += w;
     });
   }
 
   // dispatch per material geometry
-  function makeRoofPart(group, geometry, cx, w, depth, baseY) {
+  function makeRoofPart(group, geometry, cx, w, depth, baseY, editor, partId) {
+    if (geometry === 'pergola') {
+      // pergola is draggable: build at local x=0 inside a group placed at cx
+      const sub = new THREE.Group();
+      makePergola(sub, 0, w, depth, baseY);
+      group.add(sub);
+      applyDraggable(sub, 'part-' + (partId || 'pergola'), editor, cx, 0);
+      return;
+    }
     if (geometry === 'pitched') return makePitched(group, cx, w, depth, baseY);
-    if (geometry === 'pergola') return makePergola(group, cx, w, depth, baseY);
     if (geometry === 'corrugated') return makeCorrugated(group, cx, w, depth, baseY);
     if (geometry === 'light') return makeSlab(group, cx, w, depth, baseY, MAT_COLOR.light, false);
     // flat (concrete) and insulated → metallic slab with panels
@@ -258,20 +327,23 @@ const VoltaSim = (() => {
     return grp;
   }
 
-  function buildObstacles(group, s) {
-    s.obstacles.forEach(o => {
+  function buildObstacles(group, s, editor) {
+    s.obstacles.forEach((o, i) => {
+      const g = new THREE.Group(); // children at local x/z 0 so the group can be dragged
       if (o.type === 'tree') {
         const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 2.4, 8),
           new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 1 }));
-        trunk.position.set(o.x, 1.2, o.z); trunk.castShadow = true; group.add(trunk);
+        trunk.position.set(0, 1.2, 0); trunk.castShadow = true; g.add(trunk);
         const crown = new THREE.Mesh(new THREE.SphereGeometry(1.8, 12, 12),
           new THREE.MeshStandardMaterial({ color: 0x1f5a30, roughness: 1 }));
-        crown.position.set(o.x, 3.4, o.z); crown.castShadow = true; group.add(crown);
+        crown.position.set(0, 3.4, 0); crown.castShadow = true; g.add(crown);
       } else {
         const b = new THREE.Mesh(new THREE.BoxGeometry(4, 8, 4),
           new THREE.MeshStandardMaterial({ color: 0x1a2636, roughness: 0.9 }));
-        b.position.set(o.x, 4, o.z); b.castShadow = true; b.receiveShadow = true; group.add(b);
+        b.position.set(0, 4, 0); b.castShadow = true; b.receiveShadow = true; g.add(b);
       }
+      group.add(g);
+      applyDraggable(g, 'obstacle-' + i, editor, o.x, o.z);
     });
   }
 
