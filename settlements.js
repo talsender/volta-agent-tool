@@ -114,5 +114,9 @@ const Settlements = (() => {
     };
   }
 
-  return { load, search, statusClass, getResult };
+  function getAll() { return _data.slice(); }
+
+  return { load, search, statusClass, getResult, getAll };
 })();
+
+if (typeof module !== 'undefined') module.exports = Settlements;
