@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { sunDirAt, sunSteps, rate, combine } = require('../shading.js');
+const { sunDirAt, sunSteps, rate, combine, exposurePct } = require('../shading.js');
 
 test('noon sun is high and from the south (+z)', () => {
   const d = sunDirAt(0.5);
@@ -37,4 +37,12 @@ test('combine multiplies orientation yield by exposure', () => {
   assert.strictEqual(combine(100, 84), 84);
   assert.strictEqual(combine(95, 80), 76);
   assert.strictEqual(combine(62, 100), 62);
+});
+
+test('exposurePct: full sun, full shade, and weighted average', () => {
+  assert.strictEqual(exposurePct([{ weight: 1, unshaded: 1 }, { weight: 1, unshaded: 1 }]), 100);
+  assert.strictEqual(exposurePct([{ weight: 1, unshaded: 0 }, { weight: 2, unshaded: 0 }]), 0);
+  // noon (weight 2) fully lit, morning (weight 1) fully shaded → 2/3 ≈ 67%
+  assert.strictEqual(exposurePct([{ weight: 1, unshaded: 0 }, { weight: 2, unshaded: 1 }]), 67);
+  assert.strictEqual(exposurePct([]), 100); // no data → full sun
 });

@@ -70,6 +70,7 @@ const SimEditor = (() => {
             <h4>הוסף מכשול</h4>
             <button class="se-btn" onclick="SimEditor.addObstacle('tree')">🌳 עץ</button>
             <button class="se-btn" onclick="SimEditor.addObstacle('building')">🏢 מבנה שכן</button>
+            <div class="se-field" style="margin-top:8px">💡 הוסף וגרור מכשול כדי לבדוק את ההצללה על הגג.</div>
           </div>
           <div class="se-card" id="se-sel" style="display:none">
             <h4 id="se-sel-title">אובייקט נבחר</h4>
@@ -124,10 +125,14 @@ const SimEditor = (() => {
 
   function render() {
     if (!sim) return;
-    sim.update(buildState());
-    sim.setSunTime(t);          // re-apply current time (update() resets the sun)
-    if (selectedId && sim.select) sim.select(selectedId);
-    refreshMetric();
+    try {
+      sim.update(buildState());
+      sim.setSunTime(t);          // re-apply current time (update() resets the sun)
+      if (selectedId && sim.select) sim.select(selectedId);
+      refreshMetric();
+    } catch (err) {
+      if (typeof console !== 'undefined') console.error('SimEditor render error:', err);
+    }
   }
 
   function orientationYield(deg) {
@@ -232,16 +237,24 @@ const SimEditor = (() => {
     if (!window.VoltaSim || !VoltaSim.available()) { alert('מנוע התלת-ממד לא נטען — דרוש חיבור אינטרנט.'); return; }
     injectCSS();
     buildOverlay();
-    model = freshModel();
-    selectedId = null;
-    const canvas = $('se-canvas');
-    sim = VoltaSim.mount(canvas, { interactive: true, onSelect: onSelect, onChange: refreshMetric, onDragEnd: refreshMetric });
-    const orng = $('se-orient-range'); if (orng) orng.value = model.orientationDeg;
-    setText('se-orient', model.orientationDeg + '°');
-    t = 0.5; const trng = $('se-time-range'); if (trng) trng.value = t;
-    setText('se-time', hourLabel(t));
-    render();
-    setTimeout(() => { if (sim) sim.resize(); }, 40);
+    try {
+      model = freshModel();
+      selectedId = null;
+      const canvas = $('se-canvas');
+      sim = VoltaSim.mount(canvas, { interactive: true, onSelect: onSelect, onChange: refreshMetric, onDragEnd: refreshMetric });
+      const orng = $('se-orient-range'); if (orng) orng.value = model.orientationDeg;
+      setText('se-orient', model.orientationDeg + '°');
+      t = 0.5; const trng = $('se-time-range'); if (trng) trng.value = t;
+      setText('se-time', hourLabel(t));
+      render();
+      setTimeout(() => { if (sim) sim.resize(); }, 40);
+    } catch (err) {
+      const stage = document.querySelector('.se-stage');
+      if (stage) stage.insertAdjacentHTML('beforeend',
+        '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:#ff5d6c;font-size:14px">⚠ שגיאה בטעינת העורך: ' +
+        ((err && err.message) ? err.message : err) + '</div>');
+      if (typeof console !== 'undefined') console.error('SimEditor open error:', err);
+    }
   }
   function close() {
     if (playRAF) { cancelAnimationFrame(playRAF); playRAF = 0; }

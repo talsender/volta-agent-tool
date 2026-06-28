@@ -38,12 +38,20 @@
     return { label: 'נמוך', cls: 'bad' };
   }
 
+  // weighted day-average of the unshaded fraction → exposure %.
+  // perStep: [{ weight, unshaded(0..1) }]. Empty/zero-weight → 100 (full sun).
+  function exposurePct(perStep) {
+    var w = 0, e = 0;
+    for (var i = 0; i < perStep.length; i++) { w += perStep[i].weight; e += perStep[i].weight * perStep[i].unshaded; }
+    return w ? Math.round((e / w) * 100) : 100;
+  }
+
   // final "sun the client gets" = orientation yield (%) × shading exposure (%)
   function combine(yieldPct, exposurePct) {
     return Math.round((yieldPct / 100) * exposurePct);
   }
 
-  var api = { sunDirAt: sunDirAt, sunSteps: sunSteps, rate: rate, combine: combine };
+  var api = { sunDirAt: sunDirAt, sunSteps: sunSteps, rate: rate, combine: combine, exposurePct: exposurePct };
   if (typeof window !== 'undefined') window.Shading = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

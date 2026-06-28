@@ -228,14 +228,13 @@ const VoltaSim = (() => {
       const centers = panels.map(p => { const v = new THREE.Vector3(); p.getWorldPosition(v); v.y += 0.06; return v; });
       const rc = new THREE.Raycaster(); rc.far = 200;
       const dirV = new THREE.Vector3();
-      let wsum = 0, esum = 0;
-      S.sunSteps(7).forEach(st => {
+      const perStep = S.sunSteps(7).map(st => {
         dirV.set(st.dir.x, st.dir.y, st.dir.z).normalize();
         let lit = 0;
         centers.forEach(c => { rc.set(c, dirV); if (!rc.intersectObjects(blockers, false).length) lit++; });
-        esum += st.weight * (lit / centers.length); wsum += st.weight;
+        return { weight: st.weight, unshaded: lit / centers.length };
       });
-      return Math.round((esum / wsum) * 100);
+      return S.exposurePct(perStep);
     }
 
     function dispose() {
