@@ -539,6 +539,8 @@ function renderAgentBar() {
   // Only lead/manager see the management panel entry.
   const canReview = !!(agent && Auth.can(agent, 'reviewRequests'));
   document.getElementById('admin-open-btn').classList.toggle('hidden', !canReview);
+  if (typeof renderMyReqBadge === 'function') renderMyReqBadge();
+  if (window.Admin && Admin.refreshBadge) Admin.refreshBadge();
 }
 async function attemptLogin() {
   const email = document.getElementById('login-email').value;
@@ -710,9 +712,36 @@ function renderMyRequests() {
     </div>`;
   }).join('');
 }
+// ---- "my requests" toolbar badge ----
+function myReqSeenKey() {
+  const a = Auth.getCurrentAgent();
+  return a ? 'volta_seen_myreq_' + a.id : null;
+}
+function getMyReqLastSeen() {
+  const k = myReqSeenKey();
+  return k ? (parseInt(localStorage.getItem(k)) || 0) : 0;
+}
+function markMyReqSeen() {
+  const k = myReqSeenKey();
+  if (k) localStorage.setItem(k, String(Date.now()));
+}
+function renderMyReqBadge() {
+  const badge = document.getElementById('myreq-badge');
+  if (!badge) return;
+  const agent = Auth.getCurrentAgent();
+  if (!agent) { badge.classList.add('hidden'); return; }
+  const { pending, unseenResolved } = Requests.myRequestsBadge(_myRequests, agent.id, getMyReqLastSeen());
+  if (pending === 0 && unseenResolved === 0) { badge.classList.add('hidden'); return; }
+  badge.textContent = pending || unseenResolved;
+  badge.classList.toggle('alert', unseenResolved > 0);
+  badge.classList.remove('hidden');
+}
+
 function initMyRequests() {
   document.getElementById('my-requests-btn').addEventListener('click', () => {
     renderMyRequests();
+    markMyReqSeen();
+    renderMyReqBadge();
     document.getElementById('my-req-modal').classList.remove('hidden');
   });
   document.getElementById('my-req-close').addEventListener('click', () => {
@@ -720,6 +749,7 @@ function initMyRequests() {
   });
   VoltaDB.subscribeRequests(list => {
     _myRequests = list;
+    renderMyReqBadge();
     if (!document.getElementById('my-req-modal').classList.contains('hidden')) renderMyRequests();
   });
 }

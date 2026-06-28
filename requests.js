@@ -73,7 +73,32 @@ const Requests = (() => {
     };
   }
 
-  return { normalizeName, mergeOverrides, buildRequest, decideRequest, overrideFromApproval, REQUESTABLE_STATUSES };
+  // Badge counts for the agent's "my requests" button.
+  // lastSeenTs: when the agent last opened the screen (ms epoch, 0 if never).
+  function myRequestsBadge(requests, agentId, lastSeenTs) {
+    const seen = lastSeenTs || 0;
+    let pending = 0, unseenResolved = 0;
+    (requests || []).forEach(r => {
+      if (r.agentId !== agentId) return;
+      if (r.status === 'pending') pending++;
+      else if ((r.resolvedAt || 0) > seen) unseenResolved++;
+    });
+    return { pending, unseenResolved };
+  }
+
+  // Badge counts for the manager/lead "manager panel" button.
+  function adminBadge(requests, lastSeenTs) {
+    const seen = lastSeenTs || 0;
+    let pending = 0, unseenNew = 0;
+    (requests || []).forEach(r => {
+      if (r.status !== 'pending') return;
+      pending++;
+      if ((r.createdAt || 0) > seen) unseenNew++;
+    });
+    return { pending, unseenNew };
+  }
+
+  return { normalizeName, mergeOverrides, buildRequest, decideRequest, overrideFromApproval, REQUESTABLE_STATUSES, myRequestsBadge, adminBadge };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Requests;

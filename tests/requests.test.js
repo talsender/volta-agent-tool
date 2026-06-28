@@ -111,3 +111,34 @@ test('overrideFromApproval משתמש בסטטוס שהנציג ביקש', () =>
 
   assert.strictEqual(Requests.overrideFromApproval({ type: 'roof' }, 'm'), null);
 });
+
+test('myRequestsBadge — סופר ממתינות של הנציג + עדכונים שלא נצפו', () => {
+  const reqs = [
+    { agentId: 'a1', status: 'pending', createdAt: 10 },
+    { agentId: 'a1', status: 'pending', createdAt: 20 },
+    { agentId: 'a1', status: 'approved', resolvedAt: 50 },   // unseen (50 > 30)
+    { agentId: 'a1', status: 'rejected', resolvedAt: 25 },   // seen (25 < 30)
+    { agentId: 'a2', status: 'pending', createdAt: 15 },     // other agent
+    { agentId: 'a2', status: 'approved', resolvedAt: 99 },   // other agent
+  ];
+  const b = Requests.myRequestsBadge(reqs, 'a1', 30);
+  assert.strictEqual(b.pending, 2);
+  assert.strictEqual(b.unseenResolved, 1);
+});
+
+test('myRequestsBadge — lastSeen חסר: כל המטופלות נחשבות חדשות', () => {
+  const reqs = [{ agentId: 'a1', status: 'approved', resolvedAt: 5 }];
+  assert.strictEqual(Requests.myRequestsBadge(reqs, 'a1', 0).unseenResolved, 1);
+});
+
+test('adminBadge — סופר את כל הממתינות + חדשות שלא נצפו', () => {
+  const reqs = [
+    { status: 'pending', createdAt: 10 },
+    { status: 'pending', createdAt: 40 },   // unseen new (40 > 30)
+    { status: 'approved', createdAt: 45 },  // not pending
+    { status: 'rejected', createdAt: 5 },
+  ];
+  const b = Requests.adminBadge(reqs, 30);
+  assert.strictEqual(b.pending, 2);
+  assert.strictEqual(b.unseenNew, 1);
+});

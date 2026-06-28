@@ -18,7 +18,10 @@
   const CYAN = 'rgba(86,247,214,';
   const GOLD = 'rgba(255,209,106,';
 
-  // ---- Hebrew name normalization (must match settlement-coords keys) ----
+  // ---- Hebrew name normalization ----
+  // Unifies the settlement CSV names with the (separately sourced) coord keys.
+  // Key fix: collapse ktiv male/haser (יי→י, וו→ו) so "קרית ים" (CSV) matches
+  // "קריית ים" (coords). Run on BOTH sides (names and re-indexed coord keys).
   const HEB_FINAL = { 'ך':'כ','ם':'מ','ן':'נ','ף':'פ','ץ':'צ' };
   function normName(s) {
     if (!s) return '';
@@ -27,7 +30,18 @@
       .replace(/['"`׳״]/g, '')
       .replace(/[־\-–—]/g, '')
       .replace(/[ךםןףץ]/g, c => HEB_FINAL[c])
-      .replace(/\s+/g, '');
+      .replace(/\s+/g, '')
+      .replace(/יי/g, 'י')
+      .replace(/וו/g, 'ו');
+  }
+
+  // Re-key a raw {name: [lat,lon]} coord map under the current normName, so a
+  // lookup with the unified normalization hits keys stored in older spelling.
+  function reindexCoords(rawCoords) {
+    const idx = {};
+    if (!rawCoords) return idx;
+    for (const k in rawCoords) idx[normName(k)] = rawCoords[k];
+    return idx;
   }
 
   // ---- pure: merge settlements with coords into drawable sites ----
@@ -64,6 +78,9 @@
     const elStage = canvas.closest('.globe-stage');
 
     // ---- site layer (lazily (re)built when settlement data lands) ----
+    // coordIndex: SETTLEMENT_COORDS re-keyed under normName, shared by the map
+    // dots and the search fly-to so both place settlements identically.
+    let coordIndex = reindexCoords((typeof window !== 'undefined' && window.SETTLEMENT_COORDS) || {});
     let sites = [];
     let _siteSig = -1;
     function ensureSites() {
@@ -71,9 +88,9 @@
         ? Settlements.getAll() : [];
       if (all.length === _siteSig) return;
       _siteSig = all.length;
-      const coords = (typeof window !== 'undefined' && window.SETTLEMENT_COORDS) || {};
+      coordIndex = reindexCoords((typeof window !== 'undefined' && window.SETTLEMENT_COORDS) || {});
       const sc = (typeof Settlements !== 'undefined' && Settlements.statusClass) || (() => 'unknown');
-      sites = buildSites(all, coords, sc);
+      sites = buildSites(all, coordIndex, sc);
       if (elNodes && sites.length) elNodes.textContent = sites.length.toLocaleString();
       buildCoverageCache();
     }
@@ -292,8 +309,9 @@
       ensureSites();
       ctx.clearRect(0, 0, W, H);
 
-      // camera ease toward locked target, or back to full-Israel at rest
-      viewZoom += ((target ? 2.0 : 1) - viewZoom) * Math.min(1, dt * 2.4);
+      // camera ease toward a located target, or back to full-Israel at rest
+      // (a search with no known coordinate keeps the full-map view).
+      viewZoom += (((target && target.pt) ? 2.0 : 1) - viewZoom) * Math.min(1, dt * 2.4);
       let desPanX = 0, desPanY = 0;
       if (target && target.pt) {
         const p0 = IsraelGeo.project(target.pt.lon, target.pt.lat,
@@ -319,18 +337,20 @@
     }
 
     // ---- public API ------------------------------------------
+    // Returns the real {lon,lat} for a settlement, or null when we have no
+    // coordinate for it (don't fake a center position — that misleads the rep).
     function ptForName(name) {
-      const C = (typeof window !== 'undefined') && window.SETTLEMENT_COORDS;
-      const ll = C && C[normName(name)];
-      if (ll) return { lon: ll[1], lat: ll[0] };
-      return { lon: centerPt.lon, lat: centerPt.lat };
+      const ll = coordIndex[normName(name)];
+      return ll ? { lon: ll[1], lat: ll[0] } : null;
     }
     window.VoltaGlobe = {
       lockTarget(name, status) {
-        target = { name: name || '', status: status || 'unknown', t: 0, pt: ptForName(name) };
+        const pt = ptForName(name);
+        target = { name: name || '', status: status || 'unknown', t: 0, pt };
         if (elHud) { elHud.classList.add('active'); elHud.dataset.status = target.status; }
         if (elName) elName.textContent = name || '—';
-        if (elCap) elCap.textContent = 'TARGET LOCK · ISR SECTOR';
+        if (elCap) elCap.textContent = pt ? 'TARGET LOCK · ISR SECTOR'
+                                          : 'LOCATION UNAVAILABLE · ISR SECTOR';
       },
       release() {
         target = null;
@@ -338,7 +358,7 @@
         if (elHud) elHud.classList.remove('active');
       },
       deploy() {
-        deploy = { t: 0, pt: target ? target.pt : { lon: centerPt.lon, lat: centerPt.lat } };
+        deploy = { t: 0, pt: (target && target.pt) ? target.pt : { lon: centerPt.lon, lat: centerPt.lat } };
         if (elCap) elCap.textContent = 'INSTALL CONFIRMED · UPLINK OK';
         if (elStage) {
           elStage.classList.remove('deploy-flash');
@@ -418,5 +438,5 @@
     } else { boot(); }
   }
 
-  if (typeof module !== 'undefined') module.exports = { buildSites, normName };
+  if (typeof module !== 'undefined') module.exports = { buildSites, normName, reindexCoords };
 })();

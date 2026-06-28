@@ -7,6 +7,16 @@ const Admin = (() => {
   let _ctx = 'manager';       // 'lead' (requests only) | 'manager' (all tabs)
   let _agentSearch = '';
   let _editingId = null;
+  const REQ_STATUS_CLASS = { pending: 'pending', approved: 'approved', rejected: 'rejected' };
+  const ROLE_CLASS = { agent: 'agent', lead: 'lead', manager: 'manager' };
+
+  function jsArg(value) {
+    return escHtml(JSON.stringify(String(value || '')));
+  }
+
+  function domId(value) {
+    return String(value || '').replace(/[^A-Za-z0-9_-]/g, '_');
+  }
 
   function managerPassword() {
     // Prefer the live (manager-editable) password from RoofStore, so the unified
@@ -17,6 +27,31 @@ const Admin = (() => {
     }
     return (typeof DEFAULT_ROOF_CONFIG !== 'undefined' && DEFAULT_ROOF_CONFIG.managerPassword)
       || 'volta';
+  }
+
+  // ---- "manager panel" toolbar badge ----
+  function adminSeenKey() {
+    const a = Auth.getCurrentAgent();
+    return a ? 'volta_seen_admin_' + a.id : null;
+  }
+  function getAdminLastSeen() {
+    const k = adminSeenKey();
+    return k ? (parseInt(localStorage.getItem(k)) || 0) : 0;
+  }
+  function markAdminSeen() {
+    const k = adminSeenKey();
+    if (k) localStorage.setItem(k, String(Date.now()));
+  }
+  function renderAdminBadge() {
+    const badge = document.getElementById('admin-badge');
+    if (!badge) return;
+    const agent = Auth.getCurrentAgent();
+    if (!agent || !Auth.can(agent, 'reviewRequests')) { badge.classList.add('hidden'); return; }
+    const { pending, unseenNew } = Requests.adminBadge(_requests, getAdminLastSeen());
+    if (pending === 0 && unseenNew === 0) { badge.classList.add('hidden'); return; }
+    badge.textContent = pending;
+    badge.classList.toggle('alert', unseenNew > 0);
+    badge.classList.remove('hidden');
   }
 
   // roleCtx: 'lead' → requests tab only; 'manager' → all tabs.
@@ -30,6 +65,8 @@ const Admin = (() => {
     renderAgents();
     renderRoof();
     switchTab('requests');
+    markAdminSeen();      // opening the panel = the manager has now seen pending items
+    renderAdminBadge();
   }
   function close() {
     document.getElementById('admin-modal').classList.add('hidden');
@@ -110,14 +147,15 @@ const Admin = (() => {
 
     pane.innerHTML = filterBar + list.map(r => {
       const permLabel = r.type === 'settlement' ? 'אשר — שינוי קבוע' : 'אשר — קבוע (גג)';
+      const idArg = jsArg(r.id);
       const actions = r.status === 'pending' ? `
         <div class="req-row-actions">
-          <button class="btn primary sm" onclick="Admin.approve('${r.id}','permanent')">${permLabel}</button>
-          <button class="btn secondary sm" onclick="Admin.approve('${r.id}','one-off')">אשר — חד-פעמי</button>
-          <button class="btn vsd sm" onclick="Admin.reject('${r.id}')">דחה</button>
+          <button class="btn primary sm" onclick="Admin.approve(${idArg},'permanent')">${permLabel}</button>
+          <button class="btn secondary sm" onclick="Admin.approve(${idArg},'one-off')">אשר — חד-פעמי</button>
+          <button class="btn vsd sm" onclick="Admin.reject(${idArg})">דחה</button>
         </div>`
         : `<div class="req-row-status">${escHtml(r.status)} ${escHtml(r.resolution || '')}${r.managerNote ? ' · ' + escHtml(r.managerNote) : ''}</div>`;
-      return `<div class="admin-req-row ${r.status}">
+      return `<div class="admin-req-row ${REQ_STATUS_CLASS[r.status] || ''}">
         <div class="ar-head"><span>${r.type === 'roof' ? '🏠 גג' : '📍 יישוב'}</span>
           <span class="ar-agent">${escHtml(r.agentName || '')}</span></div>
         <div class="ar-subject">${escHtml(r.subject || '')}</div>
@@ -200,32 +238,36 @@ const Admin = (() => {
   }
 
   function viewRowHtml(a) {
+    const idArg = jsArg(a.id);
+    const roleClass = ROLE_CLASS[a.role] || 'agent';
     return `<div class="agent-row ${a.active ? '' : 'inactive'}">
       <span class="ag-name">${escHtml(a.name || '')}</span>
-      <span class="role-badge role-${escHtml(a.role || 'agent')}">${escHtml(Auth.roleLabel(a.role))}</span>
+      <span class="role-badge role-${roleClass}">${escHtml(Auth.roleLabel(a.role))}</span>
       <span class="ag-code">${escHtml(a.email || '')}</span>
       <span class="ag-phone">${escHtml(a.phone || '')}</span>
       <span class="ag-state">${a.active ? 'פעיל' : 'מושבת'}${a.lastLoginAt ? ' · כניסה ' + fmtDate(a.lastLoginAt) : ''}</span>
       <span class="ag-actions">
-        <button class="btn secondary sm" onclick="Admin.startEdit('${a.id}')">ערוך</button>
-        <button class="btn secondary sm" onclick="Admin.toggleAgent('${a.id}')">${a.active ? 'השבת' : 'הפעל'}</button>
-        <button class="btn vsd sm" onclick="Admin.removeAgent('${a.id}')">מחק</button>
+        <button class="btn secondary sm" onclick="Admin.startEdit(${idArg})">ערוך</button>
+        <button class="btn secondary sm" onclick="Admin.toggleAgent(${idArg})">${a.active ? 'השבת' : 'הפעל'}</button>
+        <button class="btn vsd sm" onclick="Admin.removeAgent(${idArg})">מחק</button>
       </span>
     </div>`;
   }
 
   function editRowHtml(a) {
+    const safeId = domId(a.id);
+    const idArg = jsArg(a.id);
     return `<div class="agent-row editing">
-      <input id="edit-name-${a.id}" class="login-input sm" value="${escHtml(a.name || '')}" placeholder="שם">
-      <input id="edit-email-${a.id}" class="login-input sm" type="email" value="${escHtml(a.email || '')}" placeholder="אימייל">
-      <input id="edit-password-${a.id}" class="login-input sm" type="password" placeholder="סיסמה חדשה (ריק = ללא שינוי)">
-      <input id="edit-phone-${a.id}" class="login-input sm" value="${escHtml(a.phone || '')}" placeholder="טלפון">
-      <select id="edit-role-${a.id}" class="login-input sm">${roleOptions(a.role)}</select>
+      <input id="edit-name-${safeId}" class="login-input sm" value="${escHtml(a.name || '')}" placeholder="שם">
+      <input id="edit-email-${safeId}" class="login-input sm" type="email" value="${escHtml(a.email || '')}" placeholder="אימייל">
+      <input id="edit-password-${safeId}" class="login-input sm" type="password" placeholder="סיסמה חדשה (ריק = ללא שינוי)">
+      <input id="edit-phone-${safeId}" class="login-input sm" value="${escHtml(a.phone || '')}" placeholder="טלפון">
+      <select id="edit-role-${safeId}" class="login-input sm">${roleOptions(a.role)}</select>
       <span class="ag-actions">
-        <button class="btn primary sm" onclick="Admin.saveEdit('${a.id}')">שמור</button>
+        <button class="btn primary sm" onclick="Admin.saveEdit(${idArg})">שמור</button>
         <button class="btn reset sm" onclick="Admin.cancelEdit()">ביטול</button>
       </span>
-      <div id="edit-error-${a.id}" class="req-error"></div>
+      <div id="edit-error-${safeId}" class="req-error"></div>
     </div>`;
   }
 
@@ -260,14 +302,15 @@ const Admin = (() => {
   async function saveEdit(id) {
     const agent = _agents.find(a => a.id === id);
     if (!agent) return;
+    const safeId = domId(id);
     const fields = {
-      name: document.getElementById('edit-name-' + id).value.trim(),
-      email: document.getElementById('edit-email-' + id).value.trim(),
-      password: document.getElementById('edit-password-' + id).value,
-      phone: document.getElementById('edit-phone-' + id).value.trim(),
-      role: document.getElementById('edit-role-' + id).value,
+      name: document.getElementById('edit-name-' + safeId).value.trim(),
+      email: document.getElementById('edit-email-' + safeId).value.trim(),
+      password: document.getElementById('edit-password-' + safeId).value,
+      phone: document.getElementById('edit-phone-' + safeId).value.trim(),
+      role: document.getElementById('edit-role-' + safeId).value,
     };
-    const err = document.getElementById('edit-error-' + id);
+    const err = document.getElementById('edit-error-' + safeId);
     const problem = Auth.validateAgentFields(fields, _agents, id);
     if (problem) { if (err) err.textContent = problem; return; }
     // Guard: don't demote the last active manager away from 'manager'.
@@ -319,7 +362,11 @@ const Admin = (() => {
       // Refresh only the list (keeps the add-form's typed values intact).
       if (_open && _ctx === 'manager') renderAgentList();
     });
-    VoltaDB.subscribeRequests(list => { _requests = list; if (_open) renderRequests(); });
+    VoltaDB.subscribeRequests(list => {
+      _requests = list;
+      renderAdminBadge();
+      if (_open) renderRequests();
+    });
   }
 
   return {
@@ -328,6 +375,7 @@ const Admin = (() => {
     filterReq, approve, reject,
     addAgent, saveEdit, toggleAgent, removeAgent, startEdit, cancelEdit, searchAgents,
     openRoofSettings,
+    refreshBadge: renderAdminBadge,
   };
 })();
 
