@@ -29,6 +29,38 @@ test('findAgentByCredentials דוחה ריקים', () => {
   assert.strictEqual(Auth.findAgentByCredentials(AGENTS, 'dani@volta.com', ''), null);
 });
 
+test('findAgentByCredentialsAsync מאמת passwordHash ומזהה סיסמת legacy', async () => {
+  const hashed = await Auth.hashPassword('secret');
+  const agents = [
+    { id: 'h1', email: 'hash@volta.com', active: true, role: 'agent', passwordHash: hashed.passwordHash },
+    { id: 'l1', email: 'legacy@volta.com', active: true, role: 'agent', password: 'plain' },
+  ];
+
+  const hashAgent = await Auth.findAgentByCredentialsAsync(agents, 'hash@volta.com', 'secret');
+  assert.strictEqual(hashAgent.id, 'h1');
+  assert.strictEqual(hashAgent._legacyPassword, false);
+
+  const legacyAgent = await Auth.findAgentByCredentialsAsync(agents, 'legacy@volta.com', 'plain');
+  assert.strictEqual(legacyAgent.id, 'l1');
+  assert.strictEqual(legacyAgent._legacyPassword, true);
+});
+
+test('hashPassword מייצר salt ומונע התאמה בסיסמה שגויה', async () => {
+  const patch = await Auth.hashPassword('secret');
+  assert.match(patch.passwordHash, /^pbkdf2:\d+:[0-9a-f]+:[0-9a-f]+$/);
+  assert.strictEqual((await Auth.verifyPassword({ active: true, passwordHash: patch.passwordHash }, 'secret')).ok, true);
+  assert.strictEqual((await Auth.verifyPassword({ active: true, passwordHash: patch.passwordHash }, 'wrong')).ok, false);
+});
+
+test('verifyPassword תומך ב-sha256 ישן ומסמן לשדרוג', async () => {
+  const crypto = require('node:crypto');
+  const salt = 'abc123';
+  const hash = crypto.createHash('sha256').update(`${salt}:secret`, 'utf8').digest('hex');
+  const result = await Auth.verifyPassword({ active: true, passwordHash: `sha256:${salt}:${hash}` }, 'secret');
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.needsRehash, true);
+});
+
 test('can — נציג יכול רק לבקש', () => {
   const agent = { role: 'agent' };
   assert.strictEqual(Auth.can(agent, 'request'), true);
@@ -67,6 +99,32 @@ test('roleLabel מחזיר תווית עברית', () => {
   assert.strictEqual(Auth.roleLabel('manager'), 'מנהל');
   assert.strictEqual(Auth.roleLabel('lead'), 'ראש צוות');
   assert.strictEqual(Auth.roleLabel('agent'), 'נציג');
+});
+
+test('reconcileCurrentAgent מעדכן session מתפקיד חי ומנתק נציג מושבת', () => {
+  const oldStorage = global.localStorage;
+  const store = new Map();
+  global.localStorage = {
+    getItem: key => store.has(key) ? store.get(key) : null,
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key),
+  };
+  try {
+    Auth.setCurrentAgent({ id: 'a1', name: 'שם ישן', email: 'old@volta.com', role: 'agent' });
+    const fresh = Auth.reconcileCurrentAgent([
+      { id: 'a1', name: 'שם חדש', email: 'new@volta.com', role: 'manager', active: true },
+    ]);
+    assert.deepStrictEqual(fresh, { id: 'a1', name: 'שם חדש', email: 'new@volta.com', role: 'manager' });
+    assert.strictEqual(Auth.getCurrentAgent().role, 'manager');
+
+    const gone = Auth.reconcileCurrentAgent([
+      { id: 'a1', name: 'שם חדש', email: 'new@volta.com', role: 'manager', active: false },
+    ]);
+    assert.strictEqual(gone, null);
+    assert.strictEqual(Auth.getCurrentAgent(), null);
+  } finally {
+    global.localStorage = oldStorage;
+  }
 });
 
 test('validateAgentFields — תקין מחזיר null', () => {

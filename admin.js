@@ -246,8 +246,10 @@ const Admin = (() => {
     const problem = Auth.validateAgentFields(fields, _agents);
     if (problem) { err.textContent = problem; return; }
     err.textContent = '';
+    const passwordPatch = await Auth.hashPassword(fields.password);
     await VoltaDB.addAgent({
-      name: fields.name, email: fields.email.toLowerCase(), password: fields.password,
+      name: fields.name, email: fields.email.toLowerCase(),
+      passwordHash: passwordPatch.passwordHash, password: null,
       phone: fields.phone, role: fields.role, active: true, createdAt: Date.now(), lastLoginAt: null,
     });
     ['new-agent-name', 'new-agent-email', 'new-agent-password', 'new-agent-phone'].forEach(id => {
@@ -274,7 +276,11 @@ const Admin = (() => {
       return;
     }
     const patch = { name: fields.name, email: fields.email.toLowerCase(), phone: fields.phone, role: fields.role };
-    if (fields.password) patch.password = fields.password; // empty = keep existing
+    if (fields.password) {
+      const passwordPatch = await Auth.hashPassword(fields.password);
+      patch.passwordHash = passwordPatch.passwordHash;
+      patch.password = null;
+    } // empty = keep existing
     _editingId = null;
     await VoltaDB.updateAgent(id, patch);
   }

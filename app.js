@@ -133,7 +133,7 @@ function renderWizard() {
     html += '<div class="prev-answers">';
     s.answers.forEach(a => {
       const cls = a.flagClass === 'warn' ? ' warn' : '';
-      html += `<div class="prev-row"><span class="prev-q">${labelForId(a.questionId)}</span><span class="prev-a${cls}">${a.label}</span></div>`;
+      html += `<div class="prev-row"><span class="prev-q">${escHtml(labelForId(a.questionId))}</span><span class="prev-a${cls}">${escHtml(a.label)}</span></div>`;
     });
     html += '</div>';
   }
@@ -141,8 +141,8 @@ function renderWizard() {
   // Current question
   html += `<div class="question-card">
     <div class="q-step">שאלה ${current} מתוך ${total}</div>
-    <div class="q-text">${q.text}</div>
-    ${q.hint ? `<div class="q-hint">${q.hint}</div>` : ''}
+    <div class="q-text">${escHtml(q.text)}</div>
+    ${q.hint ? `<div class="q-hint">${escHtml(q.hint)}</div>` : ''}
     ${renderQuestionInput(q)}
   </div>`;
 
@@ -305,14 +305,14 @@ function renderQuestionInput(q) {
   if (q.type === 'buttons') {
     return '<div class="answer-row">' +
       q.options.map((opt, i) =>
-        `<button class="answer-btn" onclick="wizardAnswer(${i})">${opt.label}</button>`
+        `<button class="answer-btn" onclick="wizardAnswer(${i})">${escHtml(opt.label)}</button>`
       ).join('') +
       '</div>';
   }
   if (q.type === 'roof-grid') {
     return '<div class="roof-grid">' +
       q.options.map((opt, i) =>
-        `<button class="roof-btn ${opt.flagClass}" onclick="wizardAnswer(${i})">${opt.label}</button>`
+        `<button class="roof-btn ${opt.flagClass}" onclick="wizardAnswer(${i})">${escHtml(opt.label)}</button>`
       ).join('') +
       '</div>';
   }
@@ -320,7 +320,7 @@ function renderQuestionInput(q) {
     const selected = Wizard.getState().selectedRoofTypes;
     const btns = q.options.map((opt, i) => {
       const isSel = selected.some(t => t.value === opt.value);
-      return `<button class="roof-btn ${opt.flagClass}${isSel ? ' selected' : ''}" onclick="wizardToggleRoof(${i})">${opt.label}</button>`;
+      return `<button class="roof-btn ${opt.flagClass}${isSel ? ' selected' : ''}" onclick="wizardToggleRoof(${i})">${escHtml(opt.label)}</button>`;
     }).join('');
     return `<div class="roof-grid">${btns}</div>
       <div class="btn-row" style="margin-top:14px">
@@ -352,7 +352,7 @@ function renderQuestionInput(q) {
     const mats = Wizard.selectedMaterials();
     const rows = mats.map((m, i) => `
       <div class="msize-row">
-        <span class="msize-label">${m.emoji} ${escHtml(m.label)}</span>
+        <span class="msize-label">${escHtml(m.emoji)} ${escHtml(m.label)}</span>
         <input type="number" min="0" max="1000" value="40" inputmode="numeric"
           class="msize-input" id="msize-${i}" data-id="${escHtml(m.id)}"
           oninput="updateMaterialSizes()">
@@ -434,7 +434,7 @@ function renderWizardResult() {
   // Answers recap
   const recap = s.answers.map(a => {
     const cls = a.flagClass === 'warn' ? ' warn' : '';
-    return `<div class="recap-row"><span class="recap-q">${labelForId(a.questionId)}</span><span class="recap-v${cls}">${a.label}</span></div>`;
+    return `<div class="recap-row"><span class="recap-q">${escHtml(labelForId(a.questionId))}</span><span class="recap-v${cls}">${escHtml(a.label)}</span></div>`;
   }).join('');
 
   if (s.outcome === 'go') {
@@ -449,7 +449,7 @@ function renderWizardResult() {
   }
 
   if (s.outcome === 'go-notes') {
-    const flags = s.flags.map(f => `<div class="flag-box"><span class="flag-icon">📌</span><span>${f}</span></div>`).join('');
+    const flags = s.flags.map(f => `<div class="flag-box"><span class="flag-icon">📌</span><span>${escHtml(f)}</span></div>`).join('');
     return `<div class="wizard-result go-notes">
       <div class="wr-header"><div class="wr-icon">⚠️</div><div class="wr-title">ניתן לקדם — שים לב להערות</div></div>
       <div class="answers-recap">${recap}</div>
@@ -484,7 +484,7 @@ function renderWizardResult() {
       <div class="wr-header"><div class="wr-icon">🔼</div><div class="wr-title">יש להעלות למנהל לפני קידום</div></div>
       <div class="answers-recap">${recap}</div>
       <div class="action-box"><div class="action-title">סיבה</div>
-        <div class="action-text">${s.escalateNote || ''}</div></div>
+        <div class="action-text">${escHtml(s.escalateNote || '')}</div></div>
       <div class="btn-row">
         <button class="btn ghost" onclick="openRoofRequest()">🚩 בקש חריגה ממנהל</button>
         <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
@@ -498,9 +498,9 @@ function renderWizardResult() {
     <div class="answers-recap">${recap}</div>
     <div class="action-box">
       <div class="action-title">🔴 הסיבה</div>
-      <div class="action-text">${s.stopReason}</div>
+      <div class="action-text">${escHtml(s.stopReason)}</div>
     </div>
-    ${s.stopScript ? `<div class="flag-box"><span class="flag-icon">💬</span><span>נוסח לנציג: <em>"${s.stopScript}"</em></span></div>` : ''}
+    ${s.stopScript ? `<div class="flag-box"><span class="flag-icon">💬</span><span>נוסח לנציג: <em>"${escHtml(s.stopScript)}"</em></span></div>` : ''}
     <div class="btn-row">
       <button class="btn ghost" onclick="openRoofRequest()">🚩 בקש חריגה ממנהל</button>
       <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
@@ -544,7 +544,7 @@ async function attemptLogin() {
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
-  const agent = Auth.findAgentByCredentials(_agents, email, password);
+  const agent = await Auth.findAgentByCredentialsAsync(_agents, email, password);
   if (!agent) { errEl.textContent = 'אימייל או סיסמה שגויים, או חשבון מושבת'; return; }
   Auth.setCurrentAgent(agent);
   errEl.textContent = '';
@@ -553,7 +553,17 @@ async function attemptLogin() {
   hideLoginGate();
   renderAgentBar();
   // Best-effort: record last login; never block the UI on failure.
-  if (VoltaDB.ready()) { try { await VoltaDB.updateAgent(agent.id, { lastLoginAt: Date.now() }); } catch (e) {} }
+  if (VoltaDB.ready()) {
+    try {
+      const patch = { lastLoginAt: Date.now() };
+      if (agent._legacyPassword || agent._needsPasswordRehash) {
+        const passwordPatch = await Auth.hashPassword(password);
+        patch.passwordHash = passwordPatch.passwordHash;
+        patch.password = null;
+      }
+      await VoltaDB.updateAgent(agent.id, patch);
+    } catch (e) {}
+  }
 }
 function refreshBootstrapVisibility() {
   // Offer bootstrap whenever there is no active manager yet (covers first-time
@@ -562,6 +572,21 @@ function refreshBootstrapVisibility() {
   if (!btn) return;
   const hasManager = _agents.some(a => a.role === 'manager' && a.active);
   btn.classList.toggle('hidden', hasManager);
+}
+function reconcileLoginState() {
+  const current = Auth.getCurrentAgent();
+  if (!current) {
+    renderAgentBar();
+    showLoginGate();
+    return;
+  }
+  const fresh = Auth.reconcileCurrentAgent(_agents);
+  if (fresh) {
+    hideLoginGate();
+  } else {
+    showLoginGate();
+  }
+  renderAgentBar();
 }
 function initAgentAuth() {
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
@@ -579,8 +604,8 @@ function initAgentAuth() {
   document.getElementById('bootstrap-btn').addEventListener('click', () => {
     if (window.Admin) Admin.bootstrap();
   });
-  // Live agents list — used to validate logins + toggle the bootstrap button.
-  VoltaDB.subscribeAgents(list => { _agents = list; refreshBootstrapVisibility(); });
+  // Live agents list — used to validate logins, reconcile sessions, and toggle bootstrap.
+  VoltaDB.subscribeAgents(list => { _agents = list; refreshBootstrapVisibility(); reconcileLoginState(); });
   if (Auth.getCurrentAgent()) { hideLoginGate(); renderAgentBar(); }
   else { showLoginGate(); }
 }
