@@ -1,5 +1,5 @@
-// Persistence + validation for roofConfig. Default backend: localStorage.
-// RoofStore is the single seam a Firebase backend can replace later.
+// Persistence + validation for roofConfig.
+// Uses Firestore when VoltaDB is connected, with localStorage/default fallback.
 const VALID_OUTCOMES = ['ok', 'warn', 'escalate', 'stop'];
 const VALID_ACTIONS = [null, 'flag', 'escalate', 'stop', 'tiles-age'];
 
@@ -53,24 +53,88 @@ function validateRoofConfig(cfg) {
 const RoofStore = (() => {
   const KEY = 'volta.roofConfig.v1';
   const clone = o => JSON.parse(JSON.stringify(o));
-  const fallback = () => (typeof DEFAULT_ROOF_CONFIG !== 'undefined' ? clone(DEFAULT_ROOF_CONFIG) : { materials: [], totalSizeThresholds: { good: 70, borderline: 60 }, tilesAgeWarning: 25, managerPassword: 'volta' });
+  const fallback = () => (typeof DEFAULT_ROOF_CONFIG !== 'undefined' ? clone(DEFAULT_ROOF_CONFIG) : { materials: [], totalSizeThresholds: { good: 70, borderline: 60 }, tilesAgeWarning: 25, managerPassword: '' });
+  let cache = null;
+  let remoteUnsub = null;
 
-  function get() {
+  function readLocal() {
     try {
       const raw = (typeof localStorage !== 'undefined') && localStorage.getItem(KEY);
-      if (raw) { const parsed = JSON.parse(raw); if (validateRoofConfig(parsed).ok) return parsed; }
-    } catch (e) { /* fall through to defaults */ }
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (validateRoofConfig(parsed).ok) return parsed;
+      }
+    } catch (e) { /* ignore bad local cache */ }
+    return null;
+  }
+
+  function writeLocal(cfg) {
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(KEY, JSON.stringify(cfg));
+      return null;
+    } catch (e) {
+      return 'שמירה מקומית נכשלה: ' + e.message;
+    }
+  }
+
+  function get() {
+    if (cache && validateRoofConfig(cache).ok) return clone(cache);
+    const local = readLocal();
+    if (local) { cache = clone(local); return clone(local); }
     return fallback();
   }
   function save(cfg) {
     const v = validateRoofConfig(cfg);
     if (!v.ok) return v;
-    try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) { return { ok: false, errors: ['שמירה נכשלה: ' + e.message] }; }
+    cache = clone(cfg);
+    const localErr = writeLocal(cache);
+    if (localErr) return { ok: false, errors: [localErr] };
+    if (typeof VoltaDB !== 'undefined' && VoltaDB.ready && VoltaDB.ready() && VoltaDB.saveRoofConfig) {
+      VoltaDB.saveRoofConfig(Object.assign({}, clone(cache), { updatedAt: Date.now() }))
+        .catch(e => console.warn('roofConfig remote save failed:', e));
+    }
     return { ok: true, errors: [] };
   }
-  function reset() { try { localStorage.removeItem(KEY); } catch (e) {} return fallback(); }
+  async function saveAsync(cfg) {
+    const v = validateRoofConfig(cfg);
+    if (!v.ok) return v;
+    cache = clone(cfg);
+    const localErr = writeLocal(cache);
+    if (localErr) return { ok: false, errors: [localErr] };
+    if (typeof VoltaDB !== 'undefined' && VoltaDB.ready && VoltaDB.ready() && VoltaDB.saveRoofConfig) {
+      try {
+        await VoltaDB.saveRoofConfig(Object.assign({}, clone(cache), { updatedAt: Date.now() }));
+      } catch (e) {
+        return { ok: false, errors: ['שמירה לשרת נכשלה: ' + e.message] };
+      }
+    }
+    return { ok: true, errors: [] };
+  }
+  function reset() {
+    try { if (typeof localStorage !== 'undefined') localStorage.removeItem(KEY); } catch (e) {}
+    cache = fallback();
+    return clone(cache);
+  }
 
-  return { get, save, reset, validate: validateRoofConfig };
+  function initRemote(onChange) {
+    if (remoteUnsub) { try { remoteUnsub(); } catch (e) {} remoteUnsub = null; }
+    if (typeof VoltaDB === 'undefined' || !VoltaDB.ready || !VoltaDB.ready() || !VoltaDB.subscribeRoofConfig) {
+      return () => {};
+    }
+    remoteUnsub = VoltaDB.subscribeRoofConfig(remoteCfg => {
+      if (!remoteCfg) return;
+      const cfg = clone(remoteCfg);
+      delete cfg.updatedAt;
+      const v = validateRoofConfig(cfg);
+      if (!v.ok) { console.warn('Ignoring invalid remote roofConfig:', v.errors); return; }
+      cache = cfg;
+      writeLocal(cache);
+      if (typeof onChange === 'function') onChange(clone(cache));
+    });
+    return remoteUnsub;
+  }
+
+  return { get, save, saveAsync, reset, initRemote, validate: validateRoofConfig };
 })();
 
 if (typeof window !== 'undefined') window.RoofStore = RoofStore;

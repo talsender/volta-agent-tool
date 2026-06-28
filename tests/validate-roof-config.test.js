@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { DEFAULT_ROOF_CONFIG } = require('../config.js');
-const { validateRoofConfig } = require('../roof-store.js');
+const { validateRoofConfig, RoofStore } = require('../roof-store.js');
 
 const clone = o => JSON.parse(JSON.stringify(o));
 
@@ -47,4 +47,57 @@ test('invalid outcome is rejected', () => {
 test('empty materials array is rejected', () => {
   const c = clone(DEFAULT_ROOF_CONFIG); c.materials = [];
   assert.strictEqual(validateRoofConfig(c).ok, false);
+});
+
+function withLocalStorage(fn) {
+  const old = global.localStorage;
+  const store = new Map();
+  global.localStorage = {
+    getItem: key => store.has(key) ? store.get(key) : null,
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: key => store.delete(key),
+  };
+  try { return fn(store); }
+  finally { global.localStorage = old; }
+}
+
+async function withLocalStorageAsync(fn) {
+  const old = global.localStorage;
+  const store = new Map();
+  global.localStorage = {
+    getItem: key => store.has(key) ? store.get(key) : null,
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: key => store.delete(key),
+  };
+  try { return await fn(store); }
+  finally { global.localStorage = old; }
+}
+
+test('RoofStore save/get persists valid config locally', () => withLocalStorage(() => {
+  const c = clone(DEFAULT_ROOF_CONFIG);
+  c.totalSizeThresholds.good = 88;
+  const res = RoofStore.save(c);
+  assert.strictEqual(res.ok, true);
+  assert.strictEqual(RoofStore.get().totalSizeThresholds.good, 88);
+}));
+
+test('RoofStore saveAsync writes remote when VoltaDB is ready', async () => {
+  await withLocalStorageAsync(async () => {
+    const oldDb = global.VoltaDB;
+    let remote = null;
+    global.VoltaDB = {
+      ready: () => true,
+      saveRoofConfig: async cfg => { remote = cfg; },
+    };
+    try {
+      const c = clone(DEFAULT_ROOF_CONFIG);
+      c.totalSizeThresholds.good = 91;
+      const res = await RoofStore.saveAsync(c);
+      assert.strictEqual(res.ok, true);
+      assert.strictEqual(remote.totalSizeThresholds.good, 91);
+      assert.ok(remote.updatedAt);
+    } finally {
+      global.VoltaDB = oldDb;
+    }
+  });
 });

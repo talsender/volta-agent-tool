@@ -765,6 +765,12 @@ async function init() {
   // Firebase loads via a deferred module script that runs before DOMContentLoaded,
   // so window.firebase is available here.
   if (window.firebase) VoltaDB.init();
+  if (window.RoofStore && RoofStore.initRemote) {
+    RoofStore.initRemote(() => {
+      if (typeof initWizard === 'function') initWizard();
+      if (typeof updateSimDock === 'function') updateSimDock();
+    });
+  }
   initAgentAuth();
   initMyRequests();
   if (typeof initManagerPanel === 'function') initManagerPanel();

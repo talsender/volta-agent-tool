@@ -45,6 +45,7 @@ npm test
 - `admin.js` - פאנל מנהל, בקשות ונציגים.
 - `wizard.js` - לוגיקת כשירות גג.
 - `requests.js` - לוגיקת בקשות חריגה.
+- `roof-store.js` - הגדרות כשירות גג עם Firestore כשזמין ו-localStorage כגיבוי.
 - `settlements.js` / `settlements-data.js` - נתוני יישובים וחיפוש.
 - `sim.js`, `sim-state.js`, `shading.js` - סימולציית תלת ממד והצללה.
 - `tests/` - בדיקות Node.
@@ -84,4 +85,6 @@ City-volta-solar-backup-YYYYMMDD-HHMMSS.zip
 - כאשר מוסיפים טקסט שמגיע ממנהל/Firestore/קובץ נתונים, יש להציג אותו דרך
   escaping ולא להכניסו ישירות ל-`innerHTML`.
 - כאשר מוסיפים יכולת מנהל חדשה, יש לבדוק אותה גם ב-UI וגם ברמת כללי Firestore.
+- הגדרות גג נשמרות ל-`roofConfig/default` כאשר Firestore זמין; ללא Firestore הן
+  נשמרות מקומית בדפדפן כגיבוי.
 - רצוי לפצל בהמשך את `app.js` ו-`admin.js` למודולים קטנים יותר.

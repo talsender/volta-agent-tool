@@ -127,10 +127,10 @@ const Settings = (() => {
     e.classList.toggle('on', errs.length > 0);
   }
 
-  function save() {
+  async function save() {
     const v = RoofStore.validate(draft);
     if (!v.ok) { showErrors(v.errors); return; }
-    const res = RoofStore.save(draft);
+    const res = RoofStore.saveAsync ? await RoofStore.saveAsync(draft) : RoofStore.save(draft);
     if (!res.ok) { showErrors(res.errors); return; }
     close();
     if (typeof onSaved === 'function') onSaved();

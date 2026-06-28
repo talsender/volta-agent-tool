@@ -54,6 +54,7 @@ npm run verify:editor
 - An agent cannot read another agent's request history.
 - A lead can review requests but cannot edit agents.
 - A manager can edit agents and settlement overrides.
+- A manager can write `roofConfig/default`; agents and leads can read it.
 - At least two manager accounts exist before deleting or disabling any manager.
 
 ## Hosting headers

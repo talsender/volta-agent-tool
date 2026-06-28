@@ -1,4 +1,4 @@
-// Firestore data layer for agents, requests, settlementOverrides.
+// Firestore data layer for agents, requests, settlementOverrides, roofConfig.
 // Loaded after the Firebase SDK modular CDN (see index.html).
 const VoltaDB = (() => {
   let _db = null;
@@ -64,11 +64,23 @@ const VoltaDB = (() => {
     return firebase.setDoc(firebase.doc(_db, 'settlementOverrides', key), value);
   }
 
+  // ---- roofConfig ----
+  function subscribeRoofConfig(cb) {
+    if (!_ok) { cb(null); return () => {}; }
+    return firebase.onSnapshot(firebase.doc(_db, 'roofConfig', 'default'), snap => {
+      cb(snap.exists ? snap.data() : null);
+    }, err => { console.warn('roofConfig listen error', err); cb(null); });
+  }
+  function saveRoofConfig(cfg) {
+    return firebase.setDoc(firebase.doc(_db, 'roofConfig', 'default'), cfg);
+  }
+
   return {
     init, ready,
     subscribeAgents, addAgent, updateAgent, deleteAgent,
     subscribeRequests, addRequest, updateRequest,
     loadOverrides, setOverride,
+    subscribeRoofConfig, saveRoofConfig,
   };
 })();
 
