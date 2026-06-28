@@ -258,11 +258,18 @@ const SimEditor = (() => {
     btn.id = 'se-open-btn'; btn.className = 'dock-toggle'; btn.title = 'עורך הצללה (מסך מלא)';
     btn.textContent = '⛶';
     btn.onclick = open;
-    const span = head.querySelector('span') || head;
-    span.insertBefore(btn, span.firstChild);
+    // place it alongside the toggle buttons (their parent span), not in the title
+    const toggle = document.getElementById('sim-dock-toggle');
+    const container = (toggle && toggle.parentNode) || head;
+    container.insertBefore(btn, container.firstChild);
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectOpenButton);
-  else setTimeout(injectOpenButton, 0);
+  function tryInject(n) {
+    injectOpenButton();
+    // the dock may be created after this script runs (parallel init); retry a few times
+    if (!document.getElementById('se-open-btn') && n > 0) setTimeout(() => tryInject(n - 1), 300);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => tryInject(8));
+  else tryInject(8);
 
   return {
     open, close, addObstacle, deleteSelected, setSelectedHeight,
