@@ -22,9 +22,9 @@ const VoltaSim = (() => {
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
     camera.position.set(15, 13, 17);
 
-    const ambient = new THREE.AmbientLight(0x2a3e58, 1.15);
+    const ambient = new THREE.AmbientLight(0x6f8bb0, 1.5);
     scene.add(ambient);
-    const sun = new THREE.DirectionalLight(0xfff1d4, 1.6);
+    const sun = new THREE.DirectionalLight(0xfff3da, 2.1);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
     sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
