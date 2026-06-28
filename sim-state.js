@@ -35,10 +35,13 @@ function buildSimState(inputs, roofConfig) {
   const shading = inputs.shading || 'none';
   const obstacles = [];
   const dist = 9;
+  let oid = 0;
   const place = (type, mult, lateral) => obstacles.push({
+    id: 'auto' + (oid++),
     type,
     x: sun.dir.x * dist * mult + lateral,
     z: sun.dir.z * dist * mult,
+    height: type === 'building' ? 8 : 3.5,
   });
   if (shading === 'partial') {
     place('tree', 1, 2);
@@ -51,8 +54,10 @@ function buildSimState(inputs, roofConfig) {
   // house footprint from total area (meters-ish), clamped to a pleasant scene size
   const footprint = Math.max(5, Math.min(18, Math.sqrt(totalArea || 25)));
   const stories = /^condo/.test(inputs.propertyType || '') ? 2 : 1;
+  // orientation: which way the roof faces. Default azimuth 180 (south) → 0 rotation.
+  const orientationRad = (180 - (inputs.azimuth || 180)) * Math.PI / 180;
 
-  return { totalArea, parts, house: { footprint, stories }, sun, obstacles };
+  return { totalArea, parts, house: { footprint, stories, orientationRad }, sun, obstacles };
 }
 
 if (typeof module !== 'undefined' && module.exports) {

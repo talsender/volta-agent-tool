@@ -109,6 +109,7 @@ const VoltaSim = (() => {
     }
 
     function update(simState) {
+      clearHelper();
       clearDynamic();
       editor.draggables = []; // meshes are recreated below
       if (!simState) return;
@@ -118,18 +119,20 @@ const VoltaSim = (() => {
       sun.position.set(d.x * 40, Math.max(8, d.y * 40), d.z * 40);
       sun.target.position.set(0, 0, 0);
       sun.target.updateMatrixWorld();
+      if (selKey) highlight(selKey); // re-bind selection box to the rebuilt object
       if (!userMoved) frameContent(); // keep the house framed until the user orbits
     }
 
     function recenter() { userMoved = false; frameContent(); }
     function resetLayout() { editor.overrides = {}; }
 
-    // ---- drag-to-move editor (move objects on the ground; shadows update live) ----
+    // ---- editor: drag-to-move + click-to-select; shadows update live ----
     const raycaster = new THREE.Raycaster();
     const ptr = new THREE.Vector2();
     const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const hitPt = new THREE.Vector3();
-    let dragging = null;
+    let dragging = null, downPt = null, moved = false;
+    let selKey = null, selHelper = null;
 
     function pointerNdc(e) {
       const r = canvas.getBoundingClientRect();
@@ -138,48 +141,109 @@ const VoltaSim = (() => {
     }
     function findDraggable(o) { while (o) { if (o.userData && o.userData.drag) return o; o = o.parent; } return null; }
 
+    function clearHelper() {
+      if (selHelper) { scene.remove(selHelper); if (selHelper.geometry) selHelper.geometry.dispose(); selHelper = null; }
+    }
+    function highlight(key) { // (re)draw the selection box for an existing object
+      clearHelper();
+      const obj = key ? editor.draggables.find(d => d.userData.drag.key === key) : null;
+      if (obj) { selHelper = new THREE.BoxHelper(obj, 0xffd16a); scene.add(selHelper); }
+    }
+    function setSelected(key) {
+      selKey = key || null;
+      highlight(selKey);
+      if (opts.onSelect) opts.onSelect(selKey);
+    }
+
     function onDown(e) {
       pointerNdc(e);
       raycaster.setFromCamera(ptr, camera);
       const hits = raycaster.intersectObjects(editor.draggables, true);
+      moved = false; downPt = { x: e.clientX, y: e.clientY };
       if (hits.length) {
         dragging = findDraggable(hits[0].object);
-        if (dragging) {
-          if (controls) controls.enabled = false;
-          canvas.style.cursor = 'grabbing';
-          e.preventDefault();
-        }
+        if (dragging) { if (controls) controls.enabled = false; canvas.style.cursor = 'grabbing'; e.preventDefault(); }
+      } else {
+        dragging = null;
+        setSelected(null); // clicking empty space deselects
       }
     }
     function onMove(e) {
       if (!dragging) return;
+      if (downPt && Math.hypot(e.clientX - downPt.x, e.clientY - downPt.y) > 3) moved = true;
       pointerNdc(e);
       raycaster.setFromCamera(ptr, camera);
       if (raycaster.ray.intersectPlane(dragPlane, hitPt)) {
-        const x = Math.max(-32, Math.min(32, hitPt.x));
-        const z = Math.max(-32, Math.min(32, hitPt.z));
+        // convert the world ground point into the object's parent frame (house parts
+        // live in a rotated group; obstacles live at world origin)
+        const local = dragging.parent ? dragging.parent.worldToLocal(hitPt.clone()) : hitPt;
+        const x = Math.max(-32, Math.min(32, local.x));
+        const z = Math.max(-32, Math.min(32, local.z));
         dragging.position.x = x; dragging.position.z = z;
         editor.overrides[dragging.userData.drag.key] = { x: x, z: z };
+        if (selHelper) selHelper.update();
       }
       e.preventDefault();
     }
     function onUp() {
-      if (dragging) { dragging = null; if (controls) controls.enabled = true; canvas.style.cursor = 'grab'; }
+      if (!dragging) return;
+      const d = dragging; dragging = null;
+      if (controls) controls.enabled = true;
+      canvas.style.cursor = 'grab';
+      if (moved) {
+        if (opts.onDragEnd) opts.onDragEnd(d.userData.drag.key);
+        if (opts.onChange) opts.onChange();
+      } else {
+        setSelected(d.userData.drag.key); // a click (no move) selects
+      }
     }
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+
+    // ---- sun time + shading exposure (for the editor) ----
+    function setSunTime(t01) {
+      const S = (typeof window !== 'undefined') && window.Shading;
+      const d = S ? S.sunDirAt(t01) : { x: 0, y: 1, z: 0.3 };
+      sun.position.set(d.x * 40, Math.max(6, d.y * 40), d.z * 40);
+      sun.target.position.set(0, 0, 0); sun.target.updateMatrixWorld();
+    }
+
+    function computeExposure() {
+      const S = (typeof window !== 'undefined') && window.Shading;
+      if (!S) return null;
+      const panels = [], blockers = [];
+      dynamic.traverse(o => { if (o.isMesh) { if (o.userData.isPanel) panels.push(o); else blockers.push(o); } });
+      if (!panels.length || !blockers.length) return panels.length ? 100 : null;
+      const centers = panels.map(p => { const v = new THREE.Vector3(); p.getWorldPosition(v); v.y += 0.06; return v; });
+      const rc = new THREE.Raycaster(); rc.far = 200;
+      const dirV = new THREE.Vector3();
+      let wsum = 0, esum = 0;
+      S.sunSteps(7).forEach(st => {
+        dirV.set(st.dir.x, st.dir.y, st.dir.z).normalize();
+        let lit = 0;
+        centers.forEach(c => { rc.set(c, dirV); if (!rc.intersectObjects(blockers, false).length) lit++; });
+        esum += st.weight * (lit / centers.length); wsum += st.weight;
+      });
+      return Math.round((esum / wsum) * 100);
+    }
 
     function dispose() {
       cancelAnimationFrame(raf);
       if (ro) ro.disconnect();
       if (controls) controls.dispose();
       window.removeEventListener('pointerup', onUp);
+      clearHelper();
       clearDynamic();
       renderer.dispose();
     }
 
-    return { update: update, dispose: dispose, resize: resize, setActive: setActive, recenter: recenter, resetLayout: resetLayout };
+    return {
+      update: update, dispose: dispose, resize: resize, setActive: setActive,
+      recenter: recenter, resetLayout: resetLayout,
+      setSunTime: setSunTime, computeExposure: computeExposure, highlight: highlight,
+      select: setSelected,
+    };
   }
 
   // ---- geometry builders (module-private) ----
@@ -198,18 +262,23 @@ const VoltaSim = (() => {
     const storyH = 3;
     const wallH = storyH * s.house.stories;
 
+    // house + roof live in a rotatable group (orientation); obstacles stay world-fixed
+    const houseGroup = new THREE.Group();
+    houseGroup.rotation.y = s.house.orientationRad || 0;
+    group.add(houseGroup);
+
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x223247, roughness: 0.9, metalness: 0.05 });
     const walls = new THREE.Mesh(new THREE.BoxGeometry(side, wallH, depth), wallMat);
     walls.position.y = wallH / 2;
     walls.castShadow = true; walls.receiveShadow = true;
-    group.add(walls);
+    houseGroup.add(walls);
 
     // roof parts laid along X, widths proportional to areaShare, total = side
     const parts = s.parts.length ? s.parts : [{ geometry: 'flat', areaShare: 1, id: '_', size: 0 }];
     let x = -side / 2;
     parts.forEach(part => {
       const w = side * (part.areaShare || (1 / parts.length));
-      makeRoofPart(group, part.geometry, x + w / 2, Math.max(0.5, w - 0.1), depth, wallH, editor, part.id);
+      makeRoofPart(houseGroup, part.geometry, x + w / 2, Math.max(0.5, w - 0.1), depth, wallH, editor, part.id);
       x += w;
     });
   }
@@ -290,7 +359,9 @@ const VoltaSim = (() => {
     for (let i = 0; i < n; i++) {
       const z = -depth / 2 + 0.3 + (depth - 0.6) * (i / (n - 1));
       const slat = new THREE.Mesh(new THREE.BoxGeometry(w - 0.3, 0.07, 0.22), i % 2 ? pv : wood);
-      slat.position.set(cx, top + 0.05, z); slat.castShadow = true; group.add(slat);
+      slat.position.set(cx, top + 0.05, z); slat.castShadow = true;
+      if (i % 2) slat.userData.isPanel = true;
+      group.add(slat);
     }
   }
 
@@ -320,7 +391,7 @@ const VoltaSim = (() => {
       for (let j = 0; j < rows; j++) {
         const panel = new THREE.Mesh(new THREE.BoxGeometry(pw * 0.9, 0.08, pd * 0.9), mat);
         panel.position.set(-w * 0.45 + pw * (i + 0.5), 0, -depth * 0.45 + pd * (j + 0.5));
-        panel.castShadow = true;
+        panel.castShadow = true; panel.userData.isPanel = true;
         grp.add(panel);
       }
     }
@@ -330,20 +401,23 @@ const VoltaSim = (() => {
   function buildObstacles(group, s, editor) {
     s.obstacles.forEach((o, i) => {
       const g = new THREE.Group(); // children at local x/z 0 so the group can be dragged
+      const h = o.height || (o.type === 'building' ? 8 : 3.5);
       if (o.type === 'tree') {
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 2.4, 8),
+        const trunkH = h * 0.34, crownR = Math.max(1, h * 0.5);
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, trunkH, 8),
           new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 1 }));
-        trunk.position.set(0, 1.2, 0); trunk.castShadow = true; g.add(trunk);
-        const crown = new THREE.Mesh(new THREE.SphereGeometry(1.8, 12, 12),
+        trunk.position.set(0, trunkH / 2, 0); trunk.castShadow = true; g.add(trunk);
+        const crown = new THREE.Mesh(new THREE.SphereGeometry(crownR, 12, 12),
           new THREE.MeshStandardMaterial({ color: 0x1f5a30, roughness: 1 }));
-        crown.position.set(0, 3.4, 0); crown.castShadow = true; g.add(crown);
+        crown.position.set(0, trunkH + crownR * 0.7, 0); crown.castShadow = true; g.add(crown);
       } else {
-        const b = new THREE.Mesh(new THREE.BoxGeometry(4, 8, 4),
+        const b = new THREE.Mesh(new THREE.BoxGeometry(4, h, 4),
           new THREE.MeshStandardMaterial({ color: 0x1a2636, roughness: 0.9 }));
-        b.position.set(0, 4, 0); b.castShadow = true; b.receiveShadow = true; g.add(b);
+        b.position.set(0, h / 2, 0); b.castShadow = true; b.receiveShadow = true; g.add(b);
       }
+      g.userData.obstacle = true;
       group.add(g);
-      applyDraggable(g, 'obstacle-' + i, editor, o.x, o.z);
+      applyDraggable(g, o.id || ('obstacle-' + i), editor, o.x, o.z);
     });
   }
 
