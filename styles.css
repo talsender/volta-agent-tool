@@ -180,7 +180,7 @@ body {
 .panel-tag::before { content:""; width: 18px; height: 1px; background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
 
 .globe-stage {
-  position: relative; aspect-ratio: 1 / 1; width: 100%;
+  position: relative; aspect-ratio: 3 / 4; width: 100%;
   border: 1px solid var(--line);
   border-radius: 10px;
   background:
