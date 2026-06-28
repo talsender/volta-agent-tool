@@ -23,10 +23,15 @@ const Admin = (() => {
     // entry honors any change made in the roof-settings editor.
     if (typeof RoofStore !== 'undefined' && RoofStore.get) {
       const cfg = RoofStore.get();
-      if (cfg && cfg.managerPassword) return cfg.managerPassword;
+      if (cfg && cfg.managerPassword) return String(cfg.managerPassword);
     }
     return (typeof DEFAULT_ROOF_CONFIG !== 'undefined' && DEFAULT_ROOF_CONFIG.managerPassword)
-      || 'volta';
+      || '';
+  }
+
+  function bootstrapPasswordEnabled() {
+    const pw = managerPassword().trim();
+    return !!pw && pw.toLowerCase() !== 'volta';
   }
 
   // ---- "manager panel" toolbar badge ----
@@ -87,6 +92,10 @@ const Admin = (() => {
   function bootstrap() {
     const hasManager = _agents.some(a => a.role === 'manager' && a.active);
     if (hasManager) { alert('כבר קיים מנהל פעיל — היכנס עם חשבון המנהל.'); return; }
+    if (!bootstrapPasswordEnabled()) {
+      alert('אתחול מנהל מהדפדפן מושבת עד להגדרת סיסמת אתחול ייחודית. לפרודקשן מומלץ ליצור מנהל דרך Firebase Console/Admin.');
+      return;
+    }
     const pw = window.prompt('סיסמת אתחול:');
     if (pw == null) return;
     if (pw === managerPassword()) open('manager');

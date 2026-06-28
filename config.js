@@ -21,7 +21,10 @@ const CONFIG = {
 const DEFAULT_ROOF_CONFIG = {
   totalSizeThresholds: { good: 70, borderline: 60 }, // m², vs sum of all materials
   tilesAgeWarning: 25,                               // years
-  managerPassword: 'volta',
+  // First-manager bootstrap password. Leave empty in production and create the
+  // first manager via Firebase Console/Admin tooling. Never use the old default
+  // "volta" outside disposable local demos.
+  managerPassword: '',
 
   materials: [
     {

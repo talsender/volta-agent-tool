@@ -20,6 +20,22 @@ Browser code and `localStorage` can be inspected or changed by a determined user
 4. Review the Firebase project API key restrictions and allowed domains.
 5. Treat all manager-editable text as untrusted input. The main wizard rendering
    escapes dynamic labels, notes, and outcomes, but new UI should keep doing so.
+6. Do not use a shared default bootstrap password. Browser bootstrap rejects the
+   old demo password `volta`; production should provision the first manager
+   outside the browser.
+
+See `PRODUCTION.md` for the required migration checklist.
+
+## Files added for production hardening
+
+- `firebase.json` adds Firebase Hosting headers and points Firestore deploys to
+  `firestore.rules`.
+- `firestore.rules` is the target locked-down ruleset for the Firebase Auth
+  migration. It intentionally requires authenticated users and role claims.
+- `firestore.rules.example` is kept as a readable reference copy.
+
+Do not deploy `firestore.rules` until Firebase Auth users and role claims are in
+place; the current custom login does not populate `request.auth`.
 
 ## Suggested Firestore access model
 

@@ -123,9 +123,9 @@
       for (const s of sites) {
         if (s.cls !== 'yes') continue;
         const p = IsraelGeo.project(s.lon, s.lat, v);
-        const r = 11 + Math.min(18, s.installCount * 3);
+        const r = 9 + Math.min(13, s.installCount * 2.5);
         const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-        g.addColorStop(0, 'rgba(61,240,138,0.09)');
+        g.addColorStop(0, 'rgba(61,240,138,0.055)');
         g.addColorStop(1, 'rgba(61,240,138,0)');
         c.fillStyle = g;
         c.beginPath(); c.arc(p.x, p.y, r, 0, Math.PI * 2); c.fill();
@@ -203,13 +203,21 @@
     }
     function drawSites(now) {
       const lockNorm = target && target.name ? normName(target.name) : null;
+      // pass 1: dark contrast halos, so every city reads as a crisp point
+      // even over the green coverage tint
+      ctx.fillStyle = 'rgba(3,8,16,0.55)';
       for (const s of sites) {
+        if (lockNorm && normName(s.name) === lockNorm) continue;
+        const p = P(s.lon, s.lat);
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2); ctx.fill();
+      }
+      // pass 2: bright status-colored cores
+      for (const s of sites) {
+        if (lockNorm && normName(s.name) === lockNorm) continue; // drawn by reticle
         const p = P(s.lon, s.lat);
         const col = STATUS_COL[s.cls] || STATUS_COL.unknown;
-        const locked = lockNorm && normName(s.name) === lockNorm;
-        if (locked) continue; // drawn on top by the reticle layer
-        ctx.fillStyle = col + '0.5)';
-        ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = col + '0.95)';
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2); ctx.fill();
       }
     }
     function drawLockedDot(p, col, now) {

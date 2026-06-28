@@ -47,7 +47,7 @@ const Settings = (() => {
               <input type="number" min="1" value="${esc(th.borderline)}" oninput="Settings.setNum('borderline', this.value)"></label>
             <label class="set-field"><span>גיל גג מקסימלי (שנים)</span>
               <input type="number" min="1" value="${esc(draft.tilesAgeWarning)}" oninput="Settings.setNum('tilesAge', this.value)"></label>
-            <label class="set-field"><span>סיסמת מנהל</span>
+            <label class="set-field"><span>סיסמת אתחול מנהל ראשון</span>
               <input type="text" value="${esc(draft.managerPassword)}" oninput="Settings.setPass(this.value)"></label>
           </div>
           <div class="set-section-title">חומרי גג</div>
