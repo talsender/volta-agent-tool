@@ -13,7 +13,7 @@ const SimEditor = (() => {
   function injectCSS() {
     if (document.getElementById('se-style')) return;
     const css = `
-    .se-overlay{position:fixed;inset:0;z-index:300;background:#04060e;display:flex;flex-direction:column;font-family:'Rubik','Heebo',sans-serif;color:#d6e8ff;direction:rtl}
+    .se-overlay{position:fixed;inset:0;z-index:300;background:#04060e;display:flex;flex-direction:column;font-family:'Assistant','Segoe UI',sans-serif;color:#d6e8ff;direction:rtl}
     .se-top{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid rgba(120,220,255,.18);background:linear-gradient(180deg,rgba(13,24,46,.9),rgba(8,14,28,.6))}
     .se-title{font-family:'JetBrains Mono',monospace;letter-spacing:.08em;color:#6ff8e7;font-size:14px}
     .se-x{background:none;border:1px solid rgba(120,220,255,.28);color:#90a8cc;border-radius:8px;cursor:pointer;padding:6px 12px;font-size:14px}
