@@ -119,6 +119,8 @@ const VoltaSim = (() => {
       sun.position.set(d.x * 40, Math.max(8, d.y * 40), d.z * 40);
       sun.target.position.set(0, 0, 0);
       sun.target.updateMatrixWorld();
+      scene.updateMatrixWorld(true); // freshly-built meshes need world matrices NOW
+                                     // (before BoxHelper / bbox framing / exposure)
       if (selKey) highlight(selKey); // re-bind selection box to the rebuilt object
       if (!userMoved) frameContent(); // keep the house framed until the user orbits
     }
@@ -198,7 +200,7 @@ const VoltaSim = (() => {
       }
     }
     canvas.addEventListener('pointerdown', onDown);
-    canvas.addEventListener('pointermove', onMove);
+    window.addEventListener('pointermove', onMove); // keep dragging off-canvas
     window.addEventListener('pointerup', onUp);
 
     // ---- sun time + shading exposure (for the editor) ----
@@ -212,9 +214,17 @@ const VoltaSim = (() => {
     function computeExposure() {
       const S = (typeof window !== 'undefined') && window.Shading;
       if (!S) return null;
+      dynamic.updateMatrixWorld(true); // ensure world positions are current
       const panels = [], blockers = [];
-      dynamic.traverse(o => { if (o.isMesh) { if (o.userData.isPanel) panels.push(o); else blockers.push(o); } });
-      if (!panels.length || !blockers.length) return panels.length ? 100 : null;
+      // only obstacles shade the panels (roof angle is captured by orientation-yield);
+      // this keeps a clean roof at ~100% exposure, which is the headline number.
+      dynamic.traverse(o => {
+        if (!o.isMesh) return;
+        if (o.userData.isPanel) panels.push(o);
+        else if (o.userData.blocker) blockers.push(o);
+      });
+      if (!panels.length) return null;
+      if (!blockers.length) return 100; // no obstacles → full sun on the panels
       const centers = panels.map(p => { const v = new THREE.Vector3(); p.getWorldPosition(v); v.y += 0.06; return v; });
       const rc = new THREE.Raycaster(); rc.far = 200;
       const dirV = new THREE.Vector3();
@@ -232,6 +242,7 @@ const VoltaSim = (() => {
       cancelAnimationFrame(raf);
       if (ro) ro.disconnect();
       if (controls) controls.dispose();
+      window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       clearHelper();
       clearDynamic();
@@ -416,6 +427,7 @@ const VoltaSim = (() => {
         b.position.set(0, h / 2, 0); b.castShadow = true; b.receiveShadow = true; g.add(b);
       }
       g.userData.obstacle = true;
+      g.traverse(o2 => { if (o2.isMesh) o2.userData.blocker = true; }); // shade source
       group.add(g);
       applyDraggable(g, o.id || ('obstacle-' + i), editor, o.x, o.z);
     });
