@@ -36,7 +36,7 @@ function renderSuggestions(results) {
   const badges = { yes: '✅ מתקינים', no: '❌ לא מתקינים', check: '⚠️ לבדוק', unknown: '❓ לא זוהה' };
   el.innerHTML = results.map((s, i) => {
     const cls = cls_fn(s.status);
-    return `<div class="suggestion-item" onclick="selectSettlement(_suggestionCache[${i}])">
+    return `<div class="suggestion-item" data-app-action="select-settlement" data-index="${i}">
       <div>
         <div class="sug-name">${escHtml(s.name)}</div>
         ${s.type ? `<div class="sug-type">${escHtml(s.type)}</div>` : ''}
@@ -65,8 +65,8 @@ function renderSettlementResult(settlement) {
         <div class="result-title">${escHtml(r.title)}</div>
         ${installBadge}
         ${r.note ? `<div class="result-note">${escHtml(r.note)}</div>` : ''}
-        ${r.showWizardBtn ? `<button class="result-action-btn" onclick="switchToWizard()">המשך לבדיקת כשירות גג ←</button>` : ''}
-        <button class="result-action-btn ghost" onclick="openSettlementRequest()">🚩 בקש חריגה ממנהל</button>
+        ${r.showWizardBtn ? `<button class="result-action-btn" data-app-action="switch-to-wizard">המשך לבדיקת כשירות גג ←</button>` : ''}
+        <button class="result-action-btn ghost" data-app-action="open-settlement-request">🚩 בקש חריגה ממנהל</button>
       </div>
     </div>`;
 }
@@ -100,6 +100,56 @@ function initSettlementTab() {
   });
 }
 
+function initAppDelegates() {
+  document.addEventListener('click', e => {
+    const actionEl = e.target.closest('[data-app-action]');
+    if (!actionEl) return;
+    const action = actionEl.dataset.appAction;
+    if (action === 'select-settlement') {
+      const settlement = _suggestionCache[parseInt(actionEl.dataset.index, 10)];
+      if (settlement) selectSettlement(settlement);
+    } else if (action === 'switch-to-wizard') {
+      switchToWizard();
+    } else if (action === 'open-settlement-request') {
+      openSettlementRequest();
+    } else if (action === 'reset-wizard') {
+      resetWizard();
+    } else if (action === 'wizard-answer') {
+      wizardAnswer(parseInt(actionEl.dataset.optionIndex, 10));
+    } else if (action === 'wizard-toggle-roof') {
+      wizardToggleRoof(parseInt(actionEl.dataset.optionIndex, 10));
+    } else if (action === 'wizard-confirm-roofs') {
+      wizardConfirmRoofs();
+    } else if (action === 'wizard-toggle-obstacle') {
+      wizardToggleObstacle(parseInt(actionEl.dataset.optionIndex, 10));
+    } else if (action === 'wizard-confirm-obstacles') {
+      wizardConfirmObstacles();
+    } else if (action === 'compass-set') {
+      compassSet(parseInt(actionEl.dataset.deg, 10));
+    } else if (action === 'wizard-orientation-confirm') {
+      wizardOrientationConfirm();
+    } else if (action === 'material-sizes-confirm') {
+      materialSizesConfirm();
+    } else if (action === 'open-roof-request') {
+      openRoofRequest();
+    } else if (action === 'dock-compass-set') {
+      dockCompassSet(parseInt(actionEl.dataset.deg, 10));
+    } else if (action === 'toggle-compass-dock') {
+      toggleCompassDock();
+    } else if (action === 'recenter-sim') {
+      recenterSim();
+    } else if (action === 'toggle-sim-dock') {
+      toggleSimDock();
+    }
+  });
+
+  document.addEventListener('input', e => {
+    const inputEl = e.target.closest('[data-app-input]');
+    if (!inputEl) return;
+    if (inputEl.dataset.appInput === 'material-size') updateMaterialSizes();
+  });
+}
+
 // ============================================================
 // WIZARD RENDERING
 // ============================================================
@@ -121,11 +171,12 @@ function renderWizard() {
   const total = flow.length;
   const current = s.step + 1;
   const pct = Math.round((s.step / total) * 100);
+  const pctClass = Math.max(0, Math.min(100, Math.round(pct / 5) * 5));
 
   let html = `
     <div class="progress-area">
       <div class="progress-label"><span>שאלה ${current} מתוך ${total}</span><span>${pct}%</span></div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-bar"><div class="progress-fill progress-${pctClass}"></div></div>
     </div>`;
 
   // Previous answers
@@ -147,7 +198,7 @@ function renderWizard() {
   </div>`;
 
   html += `<div class="btn-row">
-    <button class="btn reset" onclick="resetWizard()">🔄 התחל מחדש</button>
+    <button class="btn reset" data-app-action="reset-wizard">🔄 התחל מחדש</button>
   </div>`;
 
   container.innerHTML = html;
@@ -171,7 +222,7 @@ function initSimDock() {
   if (!canvas) return;
   if (!window.VoltaSim || !VoltaSim.available()) {
     if (msg) { msg.innerHTML = '⚠ טעינת מנוע התלת-ממד (Three.js) נכשלה.<br>דרוש חיבור אינטרנט — רענן את הדף.'; msg.classList.add('on'); }
-    canvas.style.display = 'none';
+    canvas.classList.add('hidden');
     return;
   }
   _dockSim = VoltaSim.mount(canvas, { interactive: true });
@@ -305,14 +356,14 @@ function renderQuestionInput(q) {
   if (q.type === 'buttons') {
     return '<div class="answer-row">' +
       q.options.map((opt, i) =>
-        `<button class="answer-btn" onclick="wizardAnswer(${i})">${escHtml(opt.label)}</button>`
+        `<button class="answer-btn" data-app-action="wizard-answer" data-option-index="${i}">${escHtml(opt.label)}</button>`
       ).join('') +
       '</div>';
   }
   if (q.type === 'roof-grid') {
     return '<div class="roof-grid">' +
       q.options.map((opt, i) =>
-        `<button class="roof-btn ${opt.flagClass}" onclick="wizardAnswer(${i})">${escHtml(opt.label)}</button>`
+        `<button class="roof-btn ${opt.flagClass}" data-app-action="wizard-answer" data-option-index="${i}">${escHtml(opt.label)}</button>`
       ).join('') +
       '</div>';
   }
@@ -320,13 +371,24 @@ function renderQuestionInput(q) {
     const selected = Wizard.getState().selectedRoofTypes;
     const btns = q.options.map((opt, i) => {
       const isSel = selected.some(t => t.value === opt.value);
-      return `<button class="roof-btn ${opt.flagClass}${isSel ? ' selected' : ''}" onclick="wizardToggleRoof(${i})">${escHtml(opt.label)}</button>`;
+      return `<button class="roof-btn ${opt.flagClass}${isSel ? ' selected' : ''}" data-app-action="wizard-toggle-roof" data-option-index="${i}">${escHtml(opt.label)}</button>`;
     }).join('');
     return `<div class="roof-grid">${btns}</div>
-      <div class="btn-row" style="margin-top:14px">
-        <button class="btn primary" onclick="wizardConfirmRoofs()">אשר בחירת גג</button>
+      <div class="btn-row mt-14">
+        <button class="btn primary" data-app-action="wizard-confirm-roofs">אשר בחירת גג</button>
       </div>
-      <div id="roof-multi-error" style="color:#e63946;font-size:13px;margin-top:8px;text-align:center;min-height:18px;"></div>`;
+      <div id="roof-multi-error" class="roof-multi-error"></div>`;
+  }
+  if (q.type === 'obstacle-multi') {
+    const selected = Wizard.getState().selectedObstacles;
+    const btns = q.options.map((opt, i) => {
+      const isSel = selected.indexOf(opt.value) !== -1;
+      return `<button class="roof-btn${isSel ? ' selected' : ''}" data-app-action="wizard-toggle-obstacle" data-option-index="${i}">${escHtml(opt.label)}</button>`;
+    }).join('');
+    return `<div class="roof-grid">${btns}</div>
+      <div class="btn-row mt-14">
+        <button class="btn primary" data-app-action="wizard-confirm-obstacles">אשר הצללות ←</button>
+      </div>`;
   }
   if (q.type === 'compass') {
     const dirs = [['צפון',0],['צ-מז',45],['מזרח',90],['ד-מז',135],['דרום',180],['ד-מע',225],['מערב',270],['צ-מע',315]];
@@ -336,7 +398,7 @@ function renderQuestionInput(q) {
         <div class="compass-hint-tag">גרור את המחוג · או בחר כיוון</div>
       </div>
       <div class="compass-dirs">
-        ${dirs.map(([l,d]) => `<button class="dir-btn" data-deg="${d}" onclick="compassSet(${d})">${l}</button>`).join('')}
+        ${dirs.map(([l,d]) => `<button class="dir-btn" data-app-action="compass-set" data-deg="${d}">${l}</button>`).join('')}
       </div>
       <div class="compass-readout">
         <div class="cr-item"><span class="cr-k">כיוון</span><span class="cr-v" id="compass-dir">—</span></div>
@@ -344,8 +406,8 @@ function renderQuestionInput(q) {
         <div class="cr-item"><span class="cr-k">דירוג</span><span class="cr-v" id="compass-quality">—</span></div>
       </div>
       <div class="compass-verdict ok" id="compass-verdict"></div>
-      <div class="btn-row" style="margin-top:14px">
-        <button class="btn primary" onclick="wizardOrientationConfirm()">אשר כיוון גג ←</button>
+      <div class="btn-row mt-14">
+        <button class="btn primary" data-app-action="wizard-orientation-confirm">אשר כיוון גג ←</button>
       </div>`;
   }
   if (q.type === 'material-sizes') {
@@ -355,15 +417,15 @@ function renderQuestionInput(q) {
         <span class="msize-label">${escHtml(m.emoji)} ${escHtml(m.label)}</span>
         <input type="number" min="0" max="1000" value="40" inputmode="numeric"
           class="msize-input" id="msize-${i}" data-id="${escHtml(m.id)}"
-          oninput="updateMaterialSizes()">
+          data-app-input="material-size">
         <span class="msize-unit">מ"ר</span>
       </div>`).join('');
     return `
       <div class="msize-list">${rows}</div>
       <div class="msize-total" id="msize-total">סה"כ: 0 מ"ר</div>
       <div class="msize-verdict ok" id="msize-verdict"></div>
-      <div class="btn-row" style="margin-top:14px">
-        <button class="btn primary" onclick="materialSizesConfirm()">אשר שטחי גג ←</button>
+      <div class="btn-row mt-14">
+        <button class="btn primary" data-app-action="material-sizes-confirm">אשר שטחי גג ←</button>
       </div>`;
   }
   return '';
@@ -408,6 +470,14 @@ function materialSizesConfirm() {
   renderWizard();
 }
 
+function wizardToggleObstacle(i) {
+  Wizard.toggleObstacle(i);
+  renderWizard(); // re-render updates the live sim dock with the new obstacle set
+}
+function wizardConfirmObstacles() {
+  Wizard.confirmObstacles();
+  renderWizard();
+}
 function wizardToggleRoof(i) {
   Wizard.toggleRoofType(i);
   renderWizard();
@@ -443,7 +513,7 @@ function renderWizardResult() {
       <div class="answers-recap">${recap}</div>
       <div class="btn-row">
         <button class="btn primary">📅 תאם שיחת מומחה</button>
-        <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
+        <button class="btn reset" data-app-action="reset-wizard">🔄 בדיקה חדשה</button>
       </div>
     </div>`;
   }
@@ -456,7 +526,7 @@ function renderWizardResult() {
       ${flags}
       <div class="btn-row">
         <button class="btn primary">📅 תאם שיחת מומחה</button>
-        <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
+        <button class="btn reset" data-app-action="reset-wizard">🔄 בדיקה חדשה</button>
       </div>
     </div>`;
   }
@@ -473,8 +543,8 @@ function renderWizardResult() {
       <div class="btn-row">
         <button class="btn secondary">📅 קבע פולואפ לתאריך</button>
         <button class="btn vsd">↗ העבר ל-VSD</button>
-        <button class="btn ghost" onclick="openRoofRequest()">🚩 בקש חריגה ממנהל</button>
-        <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
+        <button class="btn ghost" data-app-action="open-roof-request">🚩 בקש חריגה ממנהל</button>
+        <button class="btn reset" data-app-action="reset-wizard">🔄 בדיקה חדשה</button>
       </div>
     </div>`;
   }
@@ -486,8 +556,8 @@ function renderWizardResult() {
       <div class="action-box"><div class="action-title">סיבה</div>
         <div class="action-text">${escHtml(s.escalateNote || '')}</div></div>
       <div class="btn-row">
-        <button class="btn ghost" onclick="openRoofRequest()">🚩 בקש חריגה ממנהל</button>
-        <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
+        <button class="btn ghost" data-app-action="open-roof-request">🚩 בקש חריגה ממנהל</button>
+        <button class="btn reset" data-app-action="reset-wizard">🔄 בדיקה חדשה</button>
       </div>
     </div>`;
   }
@@ -502,8 +572,8 @@ function renderWizardResult() {
     </div>
     ${s.stopScript ? `<div class="flag-box"><span class="flag-icon">💬</span><span>נוסח לנציג: <em>"${escHtml(s.stopScript)}"</em></span></div>` : ''}
     <div class="btn-row">
-      <button class="btn ghost" onclick="openRoofRequest()">🚩 בקש חריגה ממנהל</button>
-      <button class="btn reset" onclick="resetWizard()">🔄 בדיקה חדשה</button>
+      <button class="btn ghost" data-app-action="open-roof-request">🚩 בקש חריגה ממנהל</button>
+      <button class="btn reset" data-app-action="reset-wizard">🔄 בדיקה חדשה</button>
     </div>
   </div>`;
 }
@@ -517,10 +587,28 @@ function initWizard() {
   renderWizard();
 }
 
+let _dataLayerInitialized = false;
+function initDataLayerWhenReady() {
+  if (_dataLayerInitialized || !window.firebase) return false;
+  _dataLayerInitialized = true;
+  VoltaDB.init();
+  if (window.RoofStore && RoofStore.initRemote) {
+    RoofStore.initRemote(() => {
+      if (typeof initWizard === 'function') initWizard();
+      if (typeof updateSimDock === 'function') updateSimDock();
+    });
+  }
+  return true;
+}
+
 // ============================================================
 // AGENT LOGIN / GATING
 // ============================================================
 let _agents = [];
+
+function authMode() {
+  return (typeof CONFIG !== 'undefined' && CONFIG.AUTH_MODE === 'firebase') ? 'firebase' : 'legacy';
+}
 
 function showLoginGate() {
   document.getElementById('login-gate').classList.remove('hidden');
@@ -540,12 +628,18 @@ function renderAgentBar() {
   const canReview = !!(agent && Auth.can(agent, 'reviewRequests'));
   document.getElementById('admin-open-btn').classList.toggle('hidden', !canReview);
   if (typeof renderMyReqBadge === 'function') renderMyReqBadge();
+  if (typeof subscribeMyRequestsForCurrentAgent === 'function') subscribeMyRequestsForCurrentAgent();
+  if (window.Admin && Admin.refreshSubscriptions) Admin.refreshSubscriptions();
   if (window.Admin && Admin.refreshBadge) Admin.refreshBadge();
 }
 async function attemptLogin() {
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
+  if (authMode() === 'firebase') {
+    await attemptFirebaseLogin(email, password, errEl);
+    return;
+  }
   const agent = await Auth.findAgentByCredentialsAsync(_agents, email, password);
   if (!agent) { errEl.textContent = 'אימייל או סיסמה שגויים, או חשבון מושבת'; return; }
   Auth.setCurrentAgent(agent);
@@ -567,11 +661,39 @@ async function attemptLogin() {
     } catch (e) {}
   }
 }
+async function attemptFirebaseLogin(email, password, errEl) {
+  if (!VoltaDB.authReady || !VoltaDB.authReady()) {
+    errEl.textContent = 'Firebase Auth לא זמין כרגע';
+    return;
+  }
+  try {
+    const user = await VoltaDB.signIn(email, password);
+    const agent = await VoltaDB.getAgentProfile(user.uid);
+    if (!agent || !agent.active) {
+      await VoltaDB.signOutAuth();
+      errEl.textContent = 'חשבון לא פעיל או חסר פרופיל נציג';
+      return;
+    }
+    Auth.setCurrentAgent(agent);
+    errEl.textContent = '';
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
+    hideLoginGate();
+    renderAgentBar();
+    try { await VoltaDB.updateAgent(agent.id, { lastLoginAt: Date.now() }); } catch (e) {}
+  } catch (e) {
+    errEl.textContent = 'אימייל או סיסמה שגויים';
+  }
+}
 function refreshBootstrapVisibility() {
   // Offer bootstrap whenever there is no active manager yet (covers first-time
   // setup and migration from older agent records that have no role/manager).
   const btn = document.getElementById('bootstrap-btn');
   if (!btn) return;
+  if (authMode() === 'firebase') {
+    btn.classList.add('hidden');
+    return;
+  }
   const hasManager = _agents.some(a => a.role === 'manager' && a.active);
   btn.classList.toggle('hidden', hasManager);
 }
@@ -597,6 +719,7 @@ function initAgentAuth() {
   });
   document.getElementById('logout-btn').addEventListener('click', () => {
     Auth.logout();
+    if (authMode() === 'firebase' && VoltaDB.signOutAuth) VoltaDB.signOutAuth().catch(() => {});
     renderAgentBar();
     showLoginGate();
   });
@@ -606,10 +729,43 @@ function initAgentAuth() {
   document.getElementById('bootstrap-btn').addEventListener('click', () => {
     if (window.Admin) Admin.bootstrap();
   });
-  // Live agents list — used to validate logins, reconcile sessions, and toggle bootstrap.
-  VoltaDB.subscribeAgents(list => { _agents = list; refreshBootstrapVisibility(); reconcileLoginState(); });
-  if (Auth.getCurrentAgent()) { hideLoginGate(); renderAgentBar(); }
-  else { showLoginGate(); }
+  if (authMode() === 'firebase') {
+    initFirebaseAuthSession();
+  } else {
+    // Live agents list — used to validate logins, reconcile sessions, and toggle bootstrap.
+    VoltaDB.subscribeAgents(list => { _agents = list; refreshBootstrapVisibility(); reconcileLoginState(); });
+    if (Auth.getCurrentAgent()) { hideLoginGate(); renderAgentBar(); }
+    else { showLoginGate(); }
+  }
+}
+
+function initFirebaseAuthSession() {
+  refreshBootstrapVisibility();
+  if (!VoltaDB.subscribeAuth) { showLoginGate(); return; }
+  VoltaDB.subscribeAuth(async user => {
+    if (!user) {
+      Auth.logout();
+      renderAgentBar();
+      showLoginGate();
+      return;
+    }
+    try {
+      const agent = await VoltaDB.getAgentProfile(user.uid);
+      if (!agent || !agent.active) {
+        Auth.logout();
+        renderAgentBar();
+        showLoginGate();
+        return;
+      }
+      Auth.setCurrentAgent(agent);
+      hideLoginGate();
+      renderAgentBar();
+    } catch (e) {
+      Auth.logout();
+      renderAgentBar();
+      showLoginGate();
+    }
+  });
 }
 
 // ============================================================
@@ -662,6 +818,7 @@ async function sendRequest() {
   const agent = Auth.getCurrentAgent();
   if (!agent) { errEl.textContent = 'לא מחובר נציג'; return; }
   if (!VoltaDB.ready()) { errEl.textContent = 'אין חיבור לשרת — נסה שוב'; return; }
+  if (reason.length > 2000) { errEl.textContent = 'הנימוק ארוך מדי (מקסימום 2000 תווים)'; return; }
   try {
     const req = Requests.buildRequest({
       type: _pendingReq.type, agent, subject: _pendingReq.subject,
@@ -689,6 +846,7 @@ function initRequestModal() {
 // MY REQUESTS
 // ============================================================
 let _myRequests = [];
+let _myReqUnsub = null;
 const STATUS_LABEL = { pending: '⏳ ממתין', approved: '✅ אושר', rejected: '❌ נדחה' };
 const RES_LABEL = { 'one-off': 'חד-פעמי', 'permanent': 'קבוע' };
 
@@ -737,6 +895,27 @@ function renderMyReqBadge() {
   badge.classList.remove('hidden');
 }
 
+function subscribeMyRequestsForCurrentAgent() {
+  if (_myReqUnsub) { try { _myReqUnsub(); } catch (e) {} _myReqUnsub = null; }
+  const agent = Auth.getCurrentAgent();
+  if (!agent || !VoltaDB.ready()) {
+    _myRequests = [];
+    renderMyReqBadge();
+    return;
+  }
+  const sub = VoltaDB.subscribeRequestsForAgent || VoltaDB.subscribeRequests;
+  _myReqUnsub = sub === VoltaDB.subscribeRequestsForAgent
+    ? VoltaDB.subscribeRequestsForAgent(agent.id, handleMyRequests)
+    : VoltaDB.subscribeRequests(handleMyRequests);
+}
+
+function handleMyRequests(list) {
+  const agent = Auth.getCurrentAgent();
+  _myRequests = agent ? list.filter(r => r.agentId === agent.id) : [];
+  renderMyReqBadge();
+  if (!document.getElementById('my-req-modal').classList.contains('hidden')) renderMyRequests();
+}
+
 function initMyRequests() {
   document.getElementById('my-requests-btn').addEventListener('click', () => {
     renderMyRequests();
@@ -747,11 +926,7 @@ function initMyRequests() {
   document.getElementById('my-req-close').addEventListener('click', () => {
     document.getElementById('my-req-modal').classList.add('hidden');
   });
-  VoltaDB.subscribeRequests(list => {
-    _myRequests = list;
-    renderMyReqBadge();
-    if (!document.getElementById('my-req-modal').classList.contains('hidden')) renderMyRequests();
-  });
+  subscribeMyRequestsForCurrentAgent();
 }
 
 // ============================================================
@@ -759,17 +934,12 @@ function initMyRequests() {
 // ============================================================
 async function init() {
   initTabs();
+  initAppDelegates();
   initSettlementTab();
   initRequestModal();
 
-  // Firebase loads via a deferred module script that runs before DOMContentLoaded,
-  // so window.firebase is available here.
-  if (window.firebase) VoltaDB.init();
-  if (window.RoofStore && RoofStore.initRemote) {
-    RoofStore.initRemote(() => {
-      if (typeof initWizard === 'function') initWizard();
-      if (typeof updateSimDock === 'function') updateSimDock();
-    });
+  if (!initDataLayerWhenReady()) {
+    window.addEventListener('firebase-ready', initDataLayerWhenReady, { once: true });
   }
   initAgentAuth();
   initMyRequests();
