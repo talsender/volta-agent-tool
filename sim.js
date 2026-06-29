@@ -263,9 +263,14 @@ const VoltaSim = (() => {
         setSelected(d.userData.drag.key); // a click (no move) selects
       }
     }
-    canvas.addEventListener('pointerdown', onDown);
-    window.addEventListener('pointermove', onMove); // keep dragging off-canvas
-    window.addEventListener('pointerup', onUp);
+    // 3D edit-drag handlers. Gated by opts.editable (default on) so a preview-only
+    // mount (e.g. the 2D-plan editor, where the plan is the sole editor) can keep
+    // orbit while disabling in-scene dragging.
+    if (opts.editable !== false) {
+      canvas.addEventListener('pointerdown', onDown);
+      window.addEventListener('pointermove', onMove); // keep dragging off-canvas
+      window.addEventListener('pointerup', onUp);
+    }
 
     // ---- sun time + shading exposure (for the editor) ----
     function setSunTime(t01) {

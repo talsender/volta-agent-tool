@@ -19,8 +19,11 @@ const RoofLayout = (() => {
     const bss = getBSS();
     const base = bss ? bss(inputs, roofConfig)
                      : { parts: [], house: { footprint: 8, stories: 1 }, obstacles: [] };
+    // square footprint so each segment's plan area (w*d) equals its real m²
+    // (footprint = sqrt(totalArea); a row of segments tiling the square gives
+    // area = areaShare * totalArea = the size the rep entered).
     const width = base.house.footprint;
-    const depth = width * 0.7;
+    const depth = width;
     const parts = base.parts.length ? base.parts : [{ id: '_', label: '', geometry: 'flat', areaShare: 1 }];
     let x = -width / 2;
     const segments = parts.map(p => {
@@ -60,3 +63,4 @@ const RoofLayout = (() => {
   return { buildLayout: buildLayout, layoutToSimState: layoutToSimState, alignToDoor: alignToDoor, segmentArea: segmentArea };
 })();
 if (typeof module !== 'undefined') module.exports = RoofLayout;
+if (typeof window !== 'undefined') window.RoofLayout = RoofLayout;
