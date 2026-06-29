@@ -32,7 +32,9 @@ window.VOLTA_OFFERINGS = [
     id: 'pergola-unikit', name: 'פרגולה סולארית — יוניקיט (הקמה חדשה)', emoji: '☀️',
     category: 'pergola', appliesTo: ['pergola','wood_pergola','alu_pergola'],
     minArea: 40, price: null, roi: null, financing: 'purchase',
-    highlights: ['הקמת פרגולת יוניקיט חדשה', 'מעל 50 מ"ר — נדרש היתר עירייה (תהליך אישורים)'],
+    highlights: ['הקמת פרגולת יוניקיט עצמאית — מינימום 40 מ"ר',
+                 'פרגולה כחלק מגג בית — נספרת לשטח הכולל (מינ׳ גג 60 מ"ר), ללא מינימום נפרד',
+                 'מעל 50 מ"ר — נדרש היתר עירייה (תהליך אישורים)'],
     note: 'אין טווח מחירים קבוע — לפי תכנון.',
   },
   {
