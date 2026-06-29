@@ -1272,3 +1272,11 @@ input[type=range]::-webkit-slider-thumb {
 .wr-offerings-title { font-weight: 700; color: var(--amber-br); margin-bottom: 2px; }
 .offering-card.dim { opacity: 0.6; }
 .offering-chip.warn { color: var(--amber); border-color: var(--amber); }
+
+/* ===================== 2D PLAN EDITOR ===================== */
+.se-split { display: flex; gap: 10px; width: 100%; height: 100%; }
+.se-pane { position: relative; flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, #0c1830, #060a16 75%); }
+.se-pane-tag { position: absolute; top: 8px; right: 10px; z-index: 2; font-family: var(--mono); font-size: 10px;
+  letter-spacing: .18em; color: var(--cyan); opacity: .85; }
+.se-plan-svg { width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
