@@ -21,7 +21,7 @@
       {id:'concrete',size:40},{id:'tiles',size:30},{id:'pergola',size:20},
       {id:'insulated',size:25},{id:'corrugated',size:25}
     ],
-    azimuth:165, shading:'heavy', propertyType:'private'
+    azimuth:165, obstacles:['tree','building','equipment','antenna','chimney'], propertyType:'private'
   }, cfg);
   const sim = VoltaSim.mount(document.getElementById('c'), { interactive:true });
   sim.update(state);

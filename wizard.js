@@ -73,6 +73,7 @@ const Wizard = (() => {
     escalateNote: '',
     followUpNote: '',
     selectedRoofTypes: [],
+    selectedObstacles: [],
   };
 
   // Live config (manager-editable). Read through RoofStore each time so edits
@@ -204,19 +205,22 @@ const Wizard = (() => {
     },
     {
       id: 'shading',
-      text: 'האם יש הצללות על הגג?',
-      hint: 'עצים, מבנים שכנים, מיתקנים על הגג',
-      type: 'buttons',
+      text: 'מה מצל על הגג? (בחר כל מה שקיים — או אל תבחר כלום אם אין)',
+      hint: 'הבחירה מופיעה בסימולציה ונגזרת ממנה הערכת ההצללה',
+      type: 'obstacle-multi',
       options: [
-        { label: '☀️ אין הצללות', value: 'none', flagClass: 'ok', action: null },
-        { label: '🌤 הצללה חלקית', value: 'partial', flagClass: 'warn',
-          action: 'flag', flagMsg: 'הצללה חלקית על הגג — המומחה יעריך השפעה על יעילות' },
-        { label: '🌥 הצללה משמעותית', value: 'heavy', flagClass: 'bad',
-          action: 'escalate',
-          escalateNote: 'הצללה משמעותית — יש לדון עם מנהל לפני קידום' },
+        { label: '🌳 עץ',                value: 'tree' },
+        { label: '🏢 מבנה שכן גבוה',     value: 'building' },
+        { label: '🛢 דוד שמש / ציוד גג', value: 'equipment' },
+        { label: '📡 אנטנה / צלחת',       value: 'antenna' },
+        { label: '🧱 ארובה / עמוד',       value: 'chimney' },
       ],
     },
   ];
+
+  // Shading messages, kept here so the derived-severity step reads from one place.
+  const SHADING_PARTIAL_FLAG = 'הצללה חלקית על הגג — המומחה יעריך השפעה על יעילות';
+  const SHADING_HEAVY_NOTE = 'הצללה משמעותית — יש לדון עם מנהל לפני קידום';
 
   const MAIN_FLOW = ['property-type','ownership','permit','connection','meter','roof-type','material-sizes','roof-orientation','shading'];
 
@@ -226,7 +230,7 @@ const Wizard = (() => {
 
   function reset() {
     state = { step: 0, answers: [], flags: [], outcome: null, stopReason: '', stopScript: '', escalateNote: '', followUpNote: '', selectedRoofTypes: [],
-      materialSizes: [], orientationAz: 180, shading: 'none', propertyType: 'private' };
+      materialSizes: [], orientationAz: 180, shading: 'none', selectedObstacles: [], propertyType: 'private' };
   }
 
   function buildFlow() {
@@ -383,6 +387,47 @@ const Wizard = (() => {
     return { done: false };
   }
 
+  // ---- shading obstacles (multi-select) ----
+  function toggleObstacle(optionIndex) {
+    const q = getQuestion('shading');
+    const val = q.options[optionIndex].value;
+    const idx = state.selectedObstacles.indexOf(val);
+    if (idx >= 0) state.selectedObstacles.splice(idx, 1);
+    else state.selectedObstacles.push(val);
+  }
+
+  // Confirm the obstacle selection: derive severity (single source of truth),
+  // apply the same flag/escalate behavior the old shading buttons had.
+  function confirmObstacles() {
+    const q = getQuestion('shading');
+    const types = state.selectedObstacles.slice();
+    const severity = (typeof window !== 'undefined' && window.deriveShadingSeverity)
+      ? window.deriveShadingSeverity(types)
+      : (types.length === 0 ? 'none'
+          : (types.indexOf('building') !== -1 || types.length >= 3 ? 'heavy' : 'partial'));
+    state.shading = severity;
+
+    const label = types.length === 0 ? 'אין הצללה'
+      : types.map(t => { const o = q.options.find(x => x.value === t); return o ? o.label : t; }).join(' + ');
+    let flagClass = 'ok';
+    if (severity === 'partial') { flagClass = 'warn'; state.flags.push(SHADING_PARTIAL_FLAG); }
+    else if (severity === 'heavy') { flagClass = 'bad'; }
+    state.answers.push({ questionId: 'shading', label, value: types.join(',') || 'none', flagClass });
+
+    if (severity === 'heavy') {
+      state.outcome = 'escalate';
+      state.escalateNote = SHADING_HEAVY_NOTE;
+      return { done: true };
+    }
+    state.step++;
+    const flow = currentFlow();
+    if (state.step >= flow.length) {
+      state.outcome = state.flags.length > 0 ? 'go-notes' : 'go';
+      return { done: true };
+    }
+    return { done: false };
+  }
+
   // Current inputs for the 3D sim. Sizes come from the confirmed material-sizes
   // answer; pass liveSizes (from the DOM) to preview before confirming.
   function getSimInputs(liveSizes, liveAz) {
@@ -395,12 +440,13 @@ const Wizard = (() => {
       materials: materials.map(m => ({ id: m.materialId || m.id, size: m.size })),
       azimuth: (typeof liveAz === 'number') ? liveAz
         : (typeof state.orientationAz === 'number') ? state.orientationAz : 180,
+      obstacles: state.selectedObstacles.slice(),
       shading: state.shading || 'none',
       propertyType: state.propertyType || 'private',
     };
   }
 
-  return { reset, currentQuestion, currentFlow, answer, getState, toggleRoofType, confirmRoofTypes, selectedMaterials, answerMaterialSizes, getSimInputs };
+  return { reset, currentQuestion, currentFlow, answer, getState, toggleRoofType, confirmRoofTypes, toggleObstacle, confirmObstacles, selectedMaterials, answerMaterialSizes, getSimInputs };
 })();
 
 if (typeof module !== 'undefined' && module.exports) {

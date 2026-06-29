@@ -6,9 +6,73 @@ const VoltaSim = (() => {
   function available() { return typeof THREE !== 'undefined'; }
 
   const MAT_COLOR = {
-    flat: 0x3b4d63, pitched: 0x8a3b2e, pergola: 0x7a5a30,
-    insulated: 0x53627a, corrugated: 0x566274, light: 0xff5d6c,
+    flat: 0x49566b, pitched: 0xa8482b, pergola: 0x7a5a30,
+    insulated: 0x6b7a92, corrugated: 0x7a8aa0, light: 0xff5d6c,
   };
+
+  // ---- procedural textures (canvas → CanvasTexture), built once and cached ----
+  const _texCache = {};
+  function procTexture(key, w, h, draw, repeat) {
+    if (_texCache[key]) return _texCache[key];
+    if (typeof document === 'undefined' || typeof THREE === 'undefined') return null;
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    draw(cv.getContext('2d'), w, h);
+    const tex = new THREE.CanvasTexture(cv);
+    if (repeat) { tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(repeat[0], repeat[1]); }
+    tex.anisotropy = 4;
+    _texCache[key] = tex;
+    return tex;
+  }
+  // PV module: dark-blue glass with a cell grid and a metal frame border.
+  function pvTexture() {
+    return procTexture('pv', 128, 128, (c, w, h) => {
+      c.fillStyle = '#0e1c44'; c.fillRect(0, 0, w, h);
+      const n = 4, pad = 10, cell = (w - pad * 2) / n;
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        const g = c.createLinearGradient(pad + i * cell, pad + j * cell, pad + (i + 1) * cell, pad + (j + 1) * cell);
+        g.addColorStop(0, '#1c3f86'); g.addColorStop(1, '#13317a');
+        c.fillStyle = g; c.fillRect(pad + i * cell + 1, pad + j * cell + 1, cell - 2, cell - 2);
+      }
+      c.strokeStyle = '#9fb6d8'; c.lineWidth = 6; c.strokeRect(3, 3, w - 6, h - 6); // frame
+    });
+  }
+  // Terracotta tile rows.
+  function tileTexture() {
+    return procTexture('tile', 128, 128, (c, w, h) => {
+      c.fillStyle = '#a8482b'; c.fillRect(0, 0, w, h);
+      const rows = 6, rh = h / rows;
+      for (let r = 0; r < rows; r++) {
+        c.fillStyle = r % 2 ? '#b8542f' : '#9c4127';
+        for (let x = -rh / 2; x < w; x += rh) {
+          c.beginPath(); c.arc(x + (r % 2 ? rh / 2 : 0), r * rh + rh, rh * 0.6, Math.PI, 0); c.fill();
+        }
+        c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(0, r * rh); c.lineTo(w, r * rh); c.stroke();
+      }
+    }, [3, 3]);
+  }
+  // Subtle concrete speckle.
+  function concreteTexture() {
+    return procTexture('concrete', 128, 128, (c, w, h) => {
+      c.fillStyle = '#566073'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 700; i++) {
+        c.fillStyle = `rgba(${Math.random() > 0.5 ? '255,255,255' : '0,0,0'},${Math.random() * 0.06})`;
+        c.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+      }
+    }, [2, 2]);
+  }
+  // Wood grain (vertical streaks).
+  function woodTexture() {
+    return procTexture('wood', 64, 128, (c, w, h) => {
+      c.fillStyle = '#7a5a30'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 26; i++) {
+        c.strokeStyle = `rgba(${Math.random() > 0.5 ? '60,40,18' : '150,115,60'},0.4)`;
+        c.lineWidth = 1 + Math.random();
+        c.beginPath(); c.moveTo(Math.random() * w, 0); c.lineTo(Math.random() * w, h); c.stroke();
+      }
+    });
+  }
 
   function mount(canvas, opts) {
     if (!available()) return null;
@@ -313,7 +377,8 @@ const VoltaSim = (() => {
 
   function makeSlab(group, cx, w, depth, baseY, color, panels, metalness) {
     const t = 0.35;
-    const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.7, metalness: (metalness == null ? 0.15 : metalness) });
+    const ctex = concreteTexture();
+    const mat = new THREE.MeshStandardMaterial({ color: color, map: ctex, roughness: 0.8, metalness: (metalness == null ? 0.1 : metalness) });
     const slab = new THREE.Mesh(new THREE.BoxGeometry(w, t, depth), mat);
     slab.position.set(cx, baseY + t / 2, 0);
     slab.castShadow = true; slab.receiveShadow = true;
@@ -326,7 +391,7 @@ const VoltaSim = (() => {
     const rh = Math.min(w, depth) * 0.42;            // ridge height
     const ang = Math.atan2(rh, w / 2);
     const slopeLen = Math.hypot(w / 2, rh);
-    const mat = new THREE.MeshStandardMaterial({ color: MAT_COLOR.pitched, roughness: 0.85, metalness: 0.05 });
+    const mat = new THREE.MeshStandardMaterial({ color: MAT_COLOR.pitched, map: tileTexture(), roughness: 0.9, metalness: 0.02 });
     [-1, 1].forEach(sgn => {
       const slope = new THREE.Mesh(new THREE.BoxGeometry(slopeLen, 0.18, depth), mat);
       slope.position.set(cx + sgn * w / 4, baseY + rh / 2, 0);
@@ -350,7 +415,7 @@ const VoltaSim = (() => {
 
   // open pergola: corner posts + perimeter beams + slats (alt. PV slats)
   function makePergola(group, cx, w, depth, baseY) {
-    const wood = new THREE.MeshStandardMaterial({ color: MAT_COLOR.pergola, roughness: 0.9 });
+    const wood = new THREE.MeshStandardMaterial({ color: MAT_COLOR.pergola, map: woodTexture(), roughness: 0.9 });
     const top = baseY + 0.4;
     const post = (px, pz) => {
       const p = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.4, 0.18), wood);
@@ -364,7 +429,7 @@ const VoltaSim = (() => {
       beam.position.set(cx + sgn * (w / 2 - 0.2), top, 0); beam.castShadow = true; group.add(beam);
     });
     // slats across x; every other slat is a PV slat
-    const pv = new THREE.MeshStandardMaterial({ color: 0x1b3a8a, emissive: 0x16306e, emissiveIntensity: 0.5, roughness: 0.35, metalness: 0.6 });
+    const pv = new THREE.MeshStandardMaterial({ color: 0xffffff, map: pvTexture(), emissive: 0x0c1c44, emissiveIntensity: 0.35, roughness: 0.35, metalness: 0.6 });
     const n = Math.max(4, Math.round(depth / 0.7));
     for (let i = 0; i < n; i++) {
       const z = -depth / 2 + 0.3 + (depth - 0.6) * (i / (n - 1));
@@ -396,10 +461,15 @@ const VoltaSim = (() => {
     const cols = Math.max(1, Math.round(w / 1.1));
     const rows = Math.max(1, Math.round(depth / 1.4));
     const pw = (w * 0.9) / cols, pd = (depth * 0.9) / rows;
-    const mat = new THREE.MeshStandardMaterial({ color: 0x1b3a8a, emissive: 0x16306e, emissiveIntensity: 0.5, roughness: 0.35, metalness: 0.6 });
+    const tex = pvTexture();
+    // top face textured (cells + frame); sides darker. BoxGeometry material order:
+    // [+x,-x,+y,-y,+z,-z] → index 2 is the top.
+    const side = new THREE.MeshStandardMaterial({ color: 0x223152, roughness: 0.5, metalness: 0.5 });
+    const topMat = new THREE.MeshStandardMaterial({ map: tex, color: 0xffffff, emissive: 0x0c1c44, emissiveIntensity: 0.35, roughness: 0.3, metalness: 0.5 });
+    const mats = [side, side, topMat, side, side, side];
     for (let i = 0; i < cols; i++) {
       for (let j = 0; j < rows; j++) {
-        const panel = new THREE.Mesh(new THREE.BoxGeometry(pw * 0.9, 0.08, pd * 0.9), mat);
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(pw * 0.9, 0.08, pd * 0.9), tex ? mats : side);
         panel.position.set(-w * 0.45 + pw * (i + 0.5), 0, -depth * 0.45 + pd * (j + 0.5));
         panel.castShadow = true; panel.userData.isPanel = true;
         grp.add(panel);
@@ -409,27 +479,85 @@ const VoltaSim = (() => {
   }
 
   function buildObstacles(group, s, editor) {
+    const roofY = 3 * ((s.house && s.house.stories) || 1) + 0.5; // top of the walls
     s.obstacles.forEach((o, i) => {
-      const g = new THREE.Group(); // children at local x/z 0 so the group can be dragged
+      const g = new THREE.Group();              // dragged in x/z
+      const inner = new THREE.Group();          // lifted to roof height for roof-mounted items
+      inner.position.y = o.onRoof ? roofY : 0;
+      g.add(inner);
       const h = o.height || (o.type === 'building' ? 8 : 3.5);
-      if (o.type === 'tree') {
-        const trunkH = h * 0.34, crownR = Math.max(1, h * 0.5);
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, trunkH, 8),
-          new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 1 }));
-        trunk.position.set(0, trunkH / 2, 0); trunk.castShadow = true; g.add(trunk);
-        const crown = new THREE.Mesh(new THREE.SphereGeometry(crownR, 12, 12),
-          new THREE.MeshStandardMaterial({ color: 0x1f5a30, roughness: 1 }));
-        crown.position.set(0, trunkH + crownR * 0.7, 0); crown.castShadow = true; g.add(crown);
-      } else {
-        const b = new THREE.Mesh(new THREE.BoxGeometry(4, h, 4),
-          new THREE.MeshStandardMaterial({ color: 0x1a2636, roughness: 0.9 }));
-        b.position.set(0, h / 2, 0); b.castShadow = true; b.receiveShadow = true; g.add(b);
+      switch (o.type) {
+        case 'tree':      buildTree(inner, h); break;
+        case 'building':  buildNeighbor(inner, h); break;
+        case 'equipment': buildEquipment(inner); break;
+        case 'antenna':   buildAntenna(inner); break;
+        case 'chimney':   buildChimney(inner); break;
+        default:          buildNeighbor(inner, h);
       }
       g.userData.obstacle = true;
       g.traverse(o2 => { if (o2.isMesh) o2.userData.blocker = true; }); // shade source
       group.add(g);
       applyDraggable(g, o.id || ('obstacle-' + i), editor, o.x, o.z);
     });
+  }
+
+  function buildTree(g, h) {
+    const trunkH = h * 0.34, crownR = Math.max(1, h * 0.5);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.34, trunkH, 8),
+      new THREE.MeshStandardMaterial({ color: 0x4a3320, map: woodTexture(), roughness: 1 }));
+    trunk.position.set(0, trunkH / 2, 0); trunk.castShadow = true; g.add(trunk);
+    // two stacked blobs for a fuller canopy
+    [[crownR, 0.7], [crownR * 0.75, 1.25]].forEach(([r, f]) => {
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0x276b38, roughness: 1 }));
+      crown.position.set(0, trunkH + crownR * f, 0); crown.castShadow = true; g.add(crown);
+    });
+  }
+
+  function buildNeighbor(g, h) {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(4.5, h, 4.5),
+      new THREE.MeshStandardMaterial({ color: 0x3b4658, map: concreteTexture(), roughness: 0.85 }));
+    body.position.set(0, h / 2, 0); body.castShadow = true; body.receiveShadow = true; g.add(body);
+    // lit windows on the wall facing the house (−z), a few rows/cols
+    const winMat = new THREE.MeshStandardMaterial({ color: 0xbfd0e6, emissive: 0x32465f, emissiveIntensity: 0.6, roughness: 0.4 });
+    const rows = Math.max(2, Math.round(h / 2.2));
+    for (let r = 0; r < rows; r++) for (let cI = -1; cI <= 1; cI++) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, 0.08), winMat);
+      win.position.set(cI * 1.3, 1.2 + r * 2.0, -4.5 / 2 - 0.02); g.add(win);
+    }
+  }
+
+  function buildEquipment(g) {
+    const metal = new THREE.MeshStandardMaterial({ color: 0xcdd6e0, roughness: 0.4, metalness: 0.7 });
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 1.5, 14), metal);
+    tank.rotation.z = Math.PI / 2; tank.position.set(0, 0.75, -0.35); tank.castShadow = true; g.add(tank);
+    [-0.55, 0.55].forEach(x => {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.5), metal);
+      leg.position.set(x, 0.25, -0.35); g.add(leg);
+    });
+    // tilted flat-plate collector in front of the tank
+    const coll = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.06, 0.9),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: pvTexture(), roughness: 0.5, metalness: 0.3 }));
+    coll.position.set(0, 0.45, 0.55); coll.rotation.x = -0.5; coll.castShadow = true; g.add(coll);
+  }
+
+  function buildAntenna(g) {
+    const metal = new THREE.MeshStandardMaterial({ color: 0xaab4c2, roughness: 0.4, metalness: 0.6 });
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.2, 8), metal);
+    mast.position.set(0, 1.1, 0); mast.castShadow = true; g.add(mast);
+    // dish: a flattened, tilted hemisphere
+    const dish = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide }));
+    dish.scale.set(1, 0.45, 1); dish.position.set(0, 1.7, 0.15); dish.rotation.x = -1.1; dish.castShadow = true; g.add(dish);
+  }
+
+  function buildChimney(g) {
+    const brick = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.6, 0.6),
+      new THREE.MeshStandardMaterial({ color: 0x8a5648, map: concreteTexture(), roughness: 0.95 }));
+    brick.position.set(0, 0.8, 0); brick.castShadow = true; g.add(brick);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.16, 0.74),
+      new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.8 }));
+    cap.position.set(0, 1.62, 0); g.add(cap);
   }
 
   return { available: available, mount: mount };
