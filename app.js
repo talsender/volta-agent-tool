@@ -507,6 +507,13 @@ function renderWizardResult() {
     return `<div class="recap-row"><span class="recap-q">${escHtml(labelForId(a.questionId))}</span><span class="recap-v${cls}">${escHtml(a.label)}</span></div>`;
   }).join('');
 
+  // Accumulated warn-notes (meter inside, borderline size, orientation, tiles age…).
+  // Shown on EVERY outcome — they don't vanish just because a roof type also
+  // triggered an escalate/stop, and the manager needs them for an exception request.
+  const flagsHtml = (s.flags && s.flags.length)
+    ? s.flags.map(f => `<div class="flag-box"><span class="flag-icon">📌</span><span>${escHtml(f)}</span></div>`).join('')
+    : '';
+
   if (s.outcome === 'go') {
     return `<div class="wizard-result go">
       <div class="wr-header"><div class="wr-icon">✅</div><div class="wr-title">ניתן לתאם שיחת מומחה</div></div>
@@ -519,11 +526,10 @@ function renderWizardResult() {
   }
 
   if (s.outcome === 'go-notes') {
-    const flags = s.flags.map(f => `<div class="flag-box"><span class="flag-icon">📌</span><span>${escHtml(f)}</span></div>`).join('');
     return `<div class="wizard-result go-notes">
       <div class="wr-header"><div class="wr-icon">⚠️</div><div class="wr-title">ניתן לקדם — שים לב להערות</div></div>
       <div class="answers-recap">${recap}</div>
-      ${flags}
+      ${flagsHtml}
       <div class="btn-row">
         <button class="btn primary">📅 תאם שיחת מומחה</button>
         <button class="btn reset" data-app-action="reset-wizard">🔄 בדיקה חדשה</button>
@@ -540,6 +546,7 @@ function renderWizardResult() {
         <div class="action-text">לקבוע עם הלקוח מתי צפוי לסדר את הנושא, ולתזמן פולואפ.</div></div>
       <div class="action-box"><div class="action-title">אפשרות ב׳ — העברה ל-VSD</div>
         <div class="action-text">אם הלקוח מעוניין בתכנון ראשוני כבר עכשיו — להעביר לשיחת VSD.</div></div>
+      ${flagsHtml}
       <div class="btn-row">
         <button class="btn secondary">📅 קבע פולואפ לתאריך</button>
         <button class="btn vsd">↗ העבר ל-VSD</button>
@@ -555,6 +562,7 @@ function renderWizardResult() {
       <div class="answers-recap">${recap}</div>
       <div class="action-box"><div class="action-title">סיבה</div>
         <div class="action-text">${escHtml(s.escalateNote || '')}</div></div>
+      ${flagsHtml}
       <div class="btn-row">
         <button class="btn ghost" data-app-action="open-roof-request">🚩 בקש חריגה ממנהל</button>
         <button class="btn reset" data-app-action="reset-wizard">🔄 בדיקה חדשה</button>
@@ -571,6 +579,7 @@ function renderWizardResult() {
       <div class="action-text">${escHtml(s.stopReason)}</div>
     </div>
     ${s.stopScript ? `<div class="flag-box"><span class="flag-icon">💬</span><span>נוסח לנציג: <em>"${escHtml(s.stopScript)}"</em></span></div>` : ''}
+    ${flagsHtml}
     <div class="btn-row">
       <button class="btn ghost" data-app-action="open-roof-request">🚩 בקש חריגה ממנהל</button>
       <button class="btn reset" data-app-action="reset-wizard">🔄 בדיקה חדשה</button>
