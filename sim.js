@@ -331,48 +331,69 @@ const VoltaSim = (() => {
   }
 
   function buildHouse(group, s, editor) {
-    const side = s.house.footprint;       // width (x)
-    const depth = side * 0.7;             // z
+    const H = s.house || {};
+    // explicit dims (new layout) or legacy footprint (dock / old callers)
+    const width = H.width != null ? H.width : (H.footprint || 8);
+    const depth = H.depth != null ? H.depth : width * 0.7;
     const storyH = 3;
-    const wallH = storyH * s.house.stories;
+    const wallH = storyH * (H.stories || 1);
 
     // house + roof live in a rotatable group (orientation); obstacles stay world-fixed
     const houseGroup = new THREE.Group();
-    houseGroup.rotation.y = s.house.orientationRad || 0;
+    houseGroup.rotation.y = H.orientationRad || 0;
     group.add(houseGroup);
 
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x223247, roughness: 0.9, metalness: 0.05 });
-    const walls = new THREE.Mesh(new THREE.BoxGeometry(side, wallH, depth), wallMat);
+    const walls = new THREE.Mesh(new THREE.BoxGeometry(width, wallH, depth), wallMat);
     walls.position.y = wallH / 2;
     walls.castShadow = true; walls.receiveShadow = true;
     houseGroup.add(walls);
 
-    // roof parts laid along X, widths proportional to areaShare, total = side
-    const parts = s.parts.length ? s.parts : [{ geometry: 'flat', areaShare: 1, id: '_', size: 0 }];
-    let x = -side / 2;
+    // entrance door on the named wall (visual anchor only)
+    addDoor(houseGroup, H.door, width, depth);
+
+    // roof segments: explicit placement (cx,cz,w,d,rotDeg) or legacy proportional row
+    const parts = s.parts && s.parts.length ? s.parts : [{ geometry: 'flat', cx: 0, cz: 0, w: width, d: depth }];
+    const explicit = parts[0] && parts[0].w != null;
+    let rowX = -width / 2;
     parts.forEach(part => {
-      const w = side * (part.areaShare || (1 / parts.length));
-      makeRoofPart(houseGroup, part.geometry, x + w / 2, Math.max(0.5, w - 0.1), depth, wallH, editor, part.id);
-      x += w;
+      const pw = part.w != null ? part.w : Math.max(0.5, width * (part.areaShare || (1 / parts.length)));
+      const pd = part.d != null ? part.d : depth;
+      const cx = part.cx != null ? part.cx : (rowX + pw / 2);
+      const cz = part.cz != null ? part.cz : 0;
+      if (!explicit) rowX += pw;
+      const sub = new THREE.Group();
+      sub.position.set(cx, 0, cz);
+      sub.rotation.y = (part.rotDeg || 0) * Math.PI / 180;
+      houseGroup.add(sub);
+      makeRoofPart(sub, part.geometry, pw, pd, wallH);
     });
   }
 
-  // dispatch per material geometry
-  function makeRoofPart(group, geometry, cx, w, depth, baseY, editor, partId) {
-    if (geometry === 'pergola') {
-      // pergola is draggable: build at local x=0 inside a group placed at cx
-      const sub = new THREE.Group();
-      makePergola(sub, 0, w, depth, baseY);
-      group.add(sub);
-      applyDraggable(sub, 'part-' + (partId || 'pergola'), editor, cx, 0);
-      return;
-    }
-    if (geometry === 'pitched') return makePitched(group, cx, w, depth, baseY);
-    if (geometry === 'corrugated') return makeCorrugated(group, cx, w, depth, baseY);
-    if (geometry === 'light') return makeSlab(group, cx, w, depth, baseY, MAT_COLOR.light, false);
+  // door: a thin dark panel flush to a wall, ~1.1m wide. Visual orientation anchor.
+  function addDoor(houseGroup, door, width, depth) {
+    if (!door) return;
+    const mat = new THREE.MeshStandardMaterial({ color: 0x0c1424, roughness: 0.7, metalness: 0.1 });
+    const dw = 1.1, dh = 2.1, t = 0.12;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(dw, dh, t), mat);
+    const u = (door.t == null ? 0.5 : door.t) - 0.5;  // -0.5..0.5 along the wall
+    if (door.side === 'S') { mesh.position.set(u * width, dh / 2, depth / 2 + t / 2); }
+    else if (door.side === 'N') { mesh.position.set(u * width, dh / 2, -depth / 2 - t / 2); }
+    else if (door.side === 'E') { mesh.rotation.y = Math.PI / 2; mesh.position.set(width / 2 + t / 2, dh / 2, u * depth); }
+    else { mesh.rotation.y = Math.PI / 2; mesh.position.set(-width / 2 - t / 2, dh / 2, u * depth); }
+    mesh.castShadow = true; houseGroup.add(mesh);
+  }
+
+  // dispatch per material geometry — the sub-group is already placed/rotated, so
+  // geometry is built centered at local origin (cx=0).
+  function makeRoofPart(group, geometry, w, d, baseY) {
+    if (geometry === 'pergola') return makePergola(group, 0, w, d, baseY);
+    if (geometry === 'pitched') return makePitched(group, 0, w, d, baseY);
+    if (geometry === 'corrugated') return makeCorrugated(group, 0, w, d, baseY);
+    if (geometry === 'light') return makeSlab(group, 0, w, d, baseY, MAT_COLOR.light, false);
     // flat (concrete) and insulated → metallic slab with panels
     const metal = geometry === 'insulated' ? 0.55 : 0.15;
-    return makeSlab(group, cx, w, depth, baseY, MAT_COLOR[geometry] || MAT_COLOR.flat, true, metal);
+    return makeSlab(group, 0, w, d, baseY, MAT_COLOR[geometry] || MAT_COLOR.flat, true, metal);
   }
 
   function makeSlab(group, cx, w, depth, baseY, color, panels, metalness) {
