@@ -803,7 +803,14 @@ input[type=range]::-webkit-slider-thumb {
   font-size: 12px; line-height: 1; flex-shrink: 0; transition: all 0.16s;
 }
 .dock-toggle:hover { color: var(--cyan); border-color: var(--cyan); }
-.dock-actions { display: flex; gap: 6px; }
+.dock-actions { display: flex; gap: 6px; align-items: center; }
+/* primary "enlarge & edit" entry — labeled, accented, auto width */
+.dock-toggle.dock-edit {
+  width: auto; height: 22px; padding: 0 10px; font-size: 11px; font-weight: 600;
+  color: var(--amber-br); border-color: rgba(255,178,74,.5);
+  background: rgba(255,178,74,.08); white-space: nowrap;
+}
+.dock-toggle.dock-edit:hover { color: var(--amber-br); border-color: var(--amber-br); background: rgba(255,178,74,.16); }
 .dock-body { padding: 12px; transition: opacity 0.2s; overflow-y: auto; }
 .compass-dock.collapsed .dock-body { display: none; }
 
@@ -1096,8 +1103,7 @@ input[type=range]::-webkit-slider-thumb {
 /* ===================== PERSISTENT 3D HOUSE DOCK (bottom-right) ===================== */
 .sim-dock {
   position: fixed; right: 16px; bottom: 16px; z-index: 70;
-  width: clamp(360px, 33vw, 520px);
-  max-width: 46vw;                       /* never collide with the left dock */
+  width: min(380px, 34vw);
   max-height: calc(100vh - 32px);        /* never run off-screen */
   background: var(--panel-2);
   border: 1px solid var(--line-strong);
@@ -1110,7 +1116,7 @@ input[type=range]::-webkit-slider-thumb {
 }
 .sim-dock.collapsed .dock-body { display: none; }
 .sim-dock-stage {
-  position: relative; width: 100%; height: clamp(280px, 34vh, 460px);
+  position: relative; width: 100%; height: clamp(240px, 26vh, 320px);
   border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
   background: radial-gradient(circle at 50% 40%, rgba(20,40,70,0.5), rgba(4,7,15,0.25) 72%);
 }

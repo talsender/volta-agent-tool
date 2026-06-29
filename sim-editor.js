@@ -262,20 +262,28 @@ const SimEditor = (() => {
   }
 
   // ---------- dock open button ----------
+  // Prefer the labeled button in index.html (#se-open-btn); just wire its click.
+  // Fall back to injecting one if the markup isn't present (parallel init / older DOM).
   function injectOpenButton() {
+    let btn = document.getElementById('se-open-btn');
+    if (btn) {
+      if (!btn._seWired) { btn.addEventListener('click', open); btn._seWired = true; }
+      return;
+    }
     const head = document.querySelector('#sim-dock .dock-head');
-    if (!head || document.getElementById('se-open-btn')) return;
-    const btn = document.createElement('button');
-    btn.id = 'se-open-btn'; btn.className = 'dock-toggle'; btn.title = 'עורך מבנה בית (מסך מלא)';
-    btn.textContent = '⛶';
-    btn.addEventListener('click', open);
+    if (!head) return;
+    btn = document.createElement('button');
+    btn.id = 'se-open-btn'; btn.className = 'dock-toggle dock-edit'; btn.title = 'הגדל ועריכה: הוספת גג, מכשולים ודלת';
+    btn.textContent = '⛶ הגדל ועריכה';
+    btn.addEventListener('click', open); btn._seWired = true;
     const toggle = document.getElementById('sim-dock-toggle');
     const container = (toggle && toggle.parentNode) || head;
     container.insertBefore(btn, container.firstChild);
   }
   function tryInject(n) {
     injectOpenButton();
-    if (!document.getElementById('se-open-btn') && n > 0) setTimeout(() => tryInject(n - 1), 300);
+    const b = document.getElementById('se-open-btn');
+    if ((!b || !b._seWired) && n > 0) setTimeout(() => tryInject(n - 1), 300);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => tryInject(8));
   else tryInject(8);
