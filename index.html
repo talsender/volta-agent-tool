@@ -153,19 +153,19 @@
   <div id="compass-dock" class="compass-dock">
     <div class="dock-head">
       <span class="dock-title"><span class="led led-cyan"></span>שושנת רוחות · כיוון גג</span>
-      <button class="dock-toggle" id="dock-toggle" onclick="toggleCompassDock()" title="כווץ / הרחב">▾</button>
+      <button class="dock-toggle" id="dock-toggle" data-app-action="toggle-compass-dock" title="כווץ / הרחב">▾</button>
     </div>
     <div class="dock-body" id="dock-body">
       <canvas id="dock-compass" class="dock-canvas" width="200" height="200"></canvas>
       <div class="dock-dirs">
-        <button class="dir-btn dock-dir-btn" data-deg="0"   onclick="dockCompassSet(0)">צ</button>
-        <button class="dir-btn dock-dir-btn" data-deg="45"  onclick="dockCompassSet(45)">צ-מז</button>
-        <button class="dir-btn dock-dir-btn" data-deg="90"  onclick="dockCompassSet(90)">מז</button>
-        <button class="dir-btn dock-dir-btn" data-deg="135" onclick="dockCompassSet(135)">ד-מז</button>
-        <button class="dir-btn dock-dir-btn" data-deg="180" onclick="dockCompassSet(180)">ד</button>
-        <button class="dir-btn dock-dir-btn" data-deg="225" onclick="dockCompassSet(225)">ד-מע</button>
-        <button class="dir-btn dock-dir-btn" data-deg="270" onclick="dockCompassSet(270)">מע</button>
-        <button class="dir-btn dock-dir-btn" data-deg="315" onclick="dockCompassSet(315)">צ-מע</button>
+        <button class="dir-btn dock-dir-btn" data-app-action="dock-compass-set" data-deg="0">צ</button>
+        <button class="dir-btn dock-dir-btn" data-app-action="dock-compass-set" data-deg="45">צ-מז</button>
+        <button class="dir-btn dock-dir-btn" data-app-action="dock-compass-set" data-deg="90">מז</button>
+        <button class="dir-btn dock-dir-btn" data-app-action="dock-compass-set" data-deg="135">ד-מז</button>
+        <button class="dir-btn dock-dir-btn" data-app-action="dock-compass-set" data-deg="180">ד</button>
+        <button class="dir-btn dock-dir-btn" data-app-action="dock-compass-set" data-deg="225">ד-מע</button>
+        <button class="dir-btn dock-dir-btn" data-app-action="dock-compass-set" data-deg="270">מע</button>
+        <button class="dir-btn dock-dir-btn" data-app-action="dock-compass-set" data-deg="315">צ-מע</button>
       </div>
       <div class="dock-verdict ok" id="dock-verdict">☀ דרום · תפוקה מיטבית</div>
     </div>
@@ -184,6 +184,7 @@
         </div>
       </div>
       <textarea id="req-reason" class="req-reason" rows="4"
+        maxlength="2000"
         placeholder="נמק מדוע אתה מבקש חריגה..."></textarea>
       <div id="req-error" class="req-error"></div>
       <div class="req-actions">
@@ -212,10 +213,12 @@
         <button class="admin-tab active" data-atab="requests">בקשות</button>
         <button class="admin-tab" data-atab="agents">נציגים</button>
         <button class="admin-tab" data-atab="roof">הגדרות גג</button>
+        <button class="admin-tab" data-atab="audit">Audit</button>
       </nav>
       <div id="admin-requests" class="admin-pane"></div>
       <div id="admin-agents" class="admin-pane hidden"></div>
       <div id="admin-roof" class="admin-pane hidden"></div>
+      <div id="admin-audit" class="admin-pane hidden"></div>
       <div class="req-actions">
         <button id="admin-close" class="btn reset">סגור</button>
       </div>
@@ -226,9 +229,9 @@
   <div id="sim-dock" class="sim-dock">
     <div class="dock-head">
       <span class="dock-title"><span class="led led-cyan"></span>סימולציית בית · 3D</span>
-      <span style="display:flex;gap:6px">
-        <button class="dock-toggle" onclick="recenterSim()" title="מרכז מחדש">⊕</button>
-        <button class="dock-toggle" id="sim-dock-toggle" onclick="toggleSimDock()" title="כווץ / הרחב">▾</button>
+      <span class="dock-actions">
+        <button class="dock-toggle" data-app-action="recenter-sim" title="מרכז מחדש">⊕</button>
+        <button class="dock-toggle" id="sim-dock-toggle" data-app-action="toggle-sim-dock" title="כווץ / הרחב">▾</button>
       </span>
     </div>
     <div class="dock-body">
@@ -246,21 +249,14 @@
   <div id="settings-modal" class="settings-modal" aria-hidden="true"></div>
 
   <!-- Firebase SDK (modular) exposed as window.firebase for the data layer -->
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import {
-      getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
-      setDoc, getDocs, onSnapshot
-    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-    window.firebase = {
-      initializeApp, getFirestore, collection, doc, addDoc, updateDoc,
-      deleteDoc, setDoc, getDocs, onSnapshot
-    };
-    window.dispatchEvent(new Event('firebase-ready'));
-  </script>
+  <script src="firebase-bootstrap.js"></script>
 
-  <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/build/three.min.js"
+    integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu"
+    crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"
+    integrity="sha384-wagZhIFgY4hD+7awjQjR4e2E294y6J2HSnd8eTNc15ZubTeQeVRZwhQJ+W6hnBsf"
+    crossorigin="anonymous"></script>
   <script src="settlement-coords.js"></script>
   <script src="israel-geo.js"></script>
   <script src="globe.js"></script>
@@ -270,6 +266,7 @@
   <script src="sim.js"></script>
   <script src="config.js"></script>
   <script src="requests.js"></script>
+  <script src="audit.js"></script>
   <script src="auth.js"></script>
   <script src="firebase.js"></script>
   <script src="roof-store.js"></script>
@@ -278,6 +275,8 @@
   <script src="settlements.js"></script>
   <script src="wizard.js"></script>
   <script src="admin.js"></script>
+  <script src="offerings-data.js"></script>
+  <script src="offerings.js"></script>
   <script src="app.js"></script>
   <script src="sim-editor.js"></script>
   <script src="settings.js"></script>
