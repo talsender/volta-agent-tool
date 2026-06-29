@@ -90,6 +90,7 @@
           <button class="tab active" data-tab="settlement"><span class="tab-code">01</span>📍 בדיקת יישוב</button>
           <button class="tab" data-tab="wizard"><span class="tab-code">02</span>🏠 כשירות גג</button>
           <button class="tab" data-tab="kb"><span class="tab-code">03</span>📚 מאגר ידע</button>
+          <button class="tab" data-tab="offerings"><span class="tab-code">04</span>💰 מסלולים ומחירים</button>
         </nav>
 
         <!-- Tab 1: Settlement Check -->
@@ -135,6 +136,17 @@
               placeholder="לדוגמה: פרגולה, סנטף, צפון, טופס 4..." autocomplete="off">
           </div>
           <div id="kb-list" class="kb-list"></div>
+        </section>
+
+        <!-- Tab 4: Offerings / Pricing -->
+        <section id="tab-offerings" class="tab-content hidden">
+          <div class="module-head">
+            <span class="module-id">MODULE&nbsp;04</span>
+            <span class="module-name">PRICING&nbsp;&amp;&nbsp;PLANS</span>
+            <span class="module-stat"><span class="led led-amber"></span>SALES&nbsp;DATA</span>
+          </div>
+          <div class="search-label">מסלולי מכירה, מחירים וליסינג — לפי הערות השטח של הנציגים:</div>
+          <div id="offerings-list" class="offerings-list"></div>
         </section>
       </main>
     </div>

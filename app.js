@@ -514,10 +514,37 @@ function renderWizardResult() {
     ? s.flags.map(f => `<div class="flag-box"><span class="flag-icon">📌</span><span>${escHtml(f)}</span></div>`).join('')
     : '';
 
+  // Commercial offerings — only meaningful when the customer is qualifiable.
+  let offeringsHtml = '';
+  if ((s.outcome === 'go' || s.outcome === 'go-notes') && typeof Offerings !== 'undefined') {
+    const ids = (s.selectedRoofTypes || []).map(t => t.value);
+    const total = (s.materialSizes || []).reduce((a, m) => a + (parseInt(m.size) || 0), 0);
+    const matches = Offerings.matchForRoof(ids, total);
+    if (matches.length) {
+      offeringsHtml = `<div class="wr-offerings">
+        <div class="wr-offerings-title">💰 מסלולים רלוונטיים ללקוח</div>
+        ${matches.map(o => `
+          <div class="offering-card${o.eligible ? '' : ' dim'}">
+            <div class="offering-head">
+              <span class="offering-name">${escHtml(o.emoji)} ${escHtml(o.name)}</span>
+              ${o.price ? `<span class="offering-price">${escHtml(fmtPrice(o.price))}</span>` : ''}
+            </div>
+            <div class="offering-meta">
+              ${o.roi ? `<span class="offering-chip">החזר ${escHtml(o.roi)}</span>` : ''}
+              ${o.financing === 'leasing' ? `<span class="offering-chip">ליסינג</span>` : ''}
+              ${o.eligible ? '' : `<span class="offering-chip warn">${escHtml(o.reason)}</span>`}
+            </div>
+            <ul class="offering-highlights">${o.highlights.map(h => `<li>${escHtml(h)}</li>`).join('')}</ul>
+          </div>`).join('')}
+      </div>`;
+    }
+  }
+
   if (s.outcome === 'go') {
     return `<div class="wizard-result go">
       <div class="wr-header"><div class="wr-icon">✅</div><div class="wr-title">ניתן לתאם שיחת מומחה</div></div>
       <div class="answers-recap">${recap}</div>
+      ${offeringsHtml}
       <div class="btn-row">
         <button class="btn primary">📅 תאם שיחת מומחה</button>
         <button class="btn reset" data-app-action="reset-wizard">🔄 בדיקה חדשה</button>
@@ -530,6 +557,7 @@ function renderWizardResult() {
       <div class="wr-header"><div class="wr-icon">⚠️</div><div class="wr-title">ניתן לקדם — שים לב להערות</div></div>
       <div class="answers-recap">${recap}</div>
       ${flagsHtml}
+      ${offeringsHtml}
       <div class="btn-row">
         <button class="btn primary">📅 תאם שיחת מומחה</button>
         <button class="btn reset" data-app-action="reset-wizard">🔄 בדיקה חדשה</button>
@@ -974,11 +1002,51 @@ async function init() {
   initDockCompass();
   initSimDock();
   initKnowledgeBase();
+  renderOfferings();
 }
 
 // ============================================================
 // KNOWLEDGE BASE (field rules distilled from the technicians' group)
 // ============================================================
+// ============================================================
+// OFFERINGS / PRICING REFERENCE
+// ============================================================
+function fmtPrice(p) {
+  if (!p) return '';
+  const n = v => v.toLocaleString('he-IL');
+  return p.unit === 'perSqm'
+    ? `${n(p.min)}-${n(p.max)} ₪ למ"ר`
+    : `${n(p.min)}-${n(p.max)} ₪`;
+}
+
+function renderOfferings() {
+  const list = document.getElementById('offerings-list');
+  if (!list || typeof Offerings === 'undefined') return;
+  const all = Offerings.getAll();
+  if (!all.length) { list.innerHTML = '<div class="kb-empty">אין נתוני מסלולים.</div>'; return; }
+  const CATS = { system: '☀️ מערכות', leasing: '🤝 ליסינג', pergola: '🏗 פרגולות' };
+  const order = ['system', 'leasing', 'pergola'];
+  list.innerHTML = order.filter(c => all.some(o => o.category === c)).map(cat => `
+    <div class="kb-cat">${escHtml(CATS[cat] || cat)}</div>
+    ${all.filter(o => o.category === cat).map(o => `
+      <div class="offering-card">
+        <div class="offering-head">
+          <span class="offering-name">${escHtml(o.emoji)} ${escHtml(o.name)}</span>
+          ${o.price ? `<span class="offering-price">${escHtml(fmtPrice(o.price))}</span>` : ''}
+        </div>
+        <div class="offering-meta">
+          ${o.minArea ? `<span class="offering-chip">מינ׳ ${o.minArea} מ"ר</span>` : ''}
+          ${o.roi ? `<span class="offering-chip">החזר ${escHtml(o.roi)}</span>` : ''}
+          ${o.financing === 'leasing' ? `<span class="offering-chip">ליסינג</span>` : ''}
+        </div>
+        <ul class="offering-highlights">
+          ${o.highlights.map(h => `<li>${escHtml(h)}</li>`).join('')}
+        </ul>
+        ${o.note ? `<div class="kb-note">${escHtml(o.note)}</div>` : ''}
+      </div>`).join('')}
+  `).join('');
+}
+
 function initKnowledgeBase() {
   const input = document.getElementById('kb-input');
   if (!input || !window.VOLTA_KB) return;
