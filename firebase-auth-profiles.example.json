@@ -1,0 +1,22 @@
+{
+  "agents": {
+    "firebase-auth-uid-manager": {
+      "name": "Volta Manager",
+      "email": "manager@example.com",
+      "phone": "",
+      "role": "manager",
+      "active": true,
+      "createdAt": 1781370000000,
+      "lastLoginAt": null
+    },
+    "firebase-auth-uid-agent": {
+      "name": "Volta Agent",
+      "email": "agent@example.com",
+      "phone": "",
+      "role": "agent",
+      "active": true,
+      "createdAt": 1781370000000,
+      "lastLoginAt": null
+    }
+  }
+}

@@ -148,3 +148,18 @@ test('validateAgentFields — אימייל כפול נדחה, אך לא מול �
   assert.match(Auth.validateAgentFields({ name: 'x', email: 'dani@volta.com', password: '1234', role: 'agent' }, AGENTS), /קיים/);
   assert.strictEqual(Auth.validateAgentFields({ name: 'דני', email: 'dani@volta.com', password: '', role: 'agent' }, AGENTS, 'a1'), null);
 });
+
+test('validateAgentFields — מגביל אורך שדות לפי Firestore rules', () => {
+  assert.match(Auth.validateAgentFields({ name: 'x'.repeat(121), email: 'a@b.com', password: '1234', role: 'agent' }, []), /ארוך/);
+  assert.match(Auth.validateAgentFields({ name: 'x', email: `${'a'.repeat(250)}@b.com`, password: '1234', role: 'agent' }, []), /ארוך/);
+  assert.match(Auth.validateAgentFields({ name: 'x', email: 'a@b.com', phone: '1'.repeat(41), password: '1234', role: 'agent' }, []), /ארוך/);
+});
+
+test('validFirebaseUid matches Firebase Auth and Firestore document id constraints', () => {
+  assert.strictEqual(Auth.validFirebaseUid('uid_manager-1'), true);
+  assert.strictEqual(Auth.validFirebaseUid('manager/one'), false);
+  assert.strictEqual(Auth.validFirebaseUid(' uid '), false);
+  assert.strictEqual(Auth.validFirebaseUid('.'), false);
+  assert.strictEqual(Auth.validFirebaseUid('x'.repeat(129)), false);
+  assert.strictEqual(Auth.validFirebaseUid('bad\u0001uid'), false);
+});
