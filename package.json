@@ -36,6 +36,6 @@
     "puppeteer-core": "^25.2.1"
   },
   "dependencies": {
-    "three": "0.128.0"
+    "three": "0.185.1"
   }
 }
