@@ -137,6 +137,17 @@ const Auth = (() => {
     return activeManagers.length === 1 && activeManagers[0].id === agentId;
   }
 
+  function validFirebaseUid(id) {
+    return typeof id === 'string'
+      && !!id
+      && id.length <= 128
+      && id === id.trim()
+      && id !== '.'
+      && id !== '..'
+      && !id.includes('/')
+      && !/[\x00-\x1F\x7F]/.test(id);
+  }
+
   // Validate agent fields for add/edit. On edit, pass ignoreId to skip the
   // agent's own email in the uniqueness check, and an empty password means
   // "keep existing". Returns an error string, or null when valid.
@@ -147,6 +158,9 @@ const Auth = (() => {
     const password = fields.password;
     if (!name) return 'שם חובה';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'אימייל לא תקין';
+    if (name.length > 120) return 'שם ארוך מדי';
+    if (email.length > 254) return 'אימייל ארוך מדי';
+    if (String(fields.phone || '').length > 40) return 'טלפון ארוך מדי';
     if (!ROLES.includes(role)) return 'תפקיד לא תקין';
     if (password != null && password !== '' && String(password).length < 4) {
       return 'סיסמה קצרה מדי (מינימום 4 תווים)';
@@ -194,7 +208,7 @@ const Auth = (() => {
 
   return {
     findAgentByCredentials, findAgentByCredentialsAsync, hashPassword, verifyPassword,
-    can, roleLabel, isLastActiveManager, validateAgentFields,
+    can, roleLabel, isLastActiveManager, validFirebaseUid, validateAgentFields,
     getCurrentAgent, setCurrentAgent, reconcileCurrentAgent, logout,
     ROLES, ROLE_LABELS, CAPS,
   };

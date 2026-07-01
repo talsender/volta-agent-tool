@@ -3,6 +3,9 @@ const CONFIG = {
   ROOF_SIZE_GOOD: 70,
   ROOF_SIZE_BORDERLINE: 60,
   ROOF_AGE_WARNING: 25,
+  // 'legacy' keeps the current custom Firestore login. Switch to 'firebase'
+  // only after Firebase Auth users, role claims, and Firestore rules are ready.
+  AUTH_MODE: 'legacy',
 
   // הדבק כאן את ערכי ה-config מפרויקט ה-Firebase שלך.
   // ניהול בקשות החריגה והנציגים נשמר ב-Firestore.

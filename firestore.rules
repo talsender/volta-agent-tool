@@ -26,36 +26,240 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == agentId;
     }
 
+    function agentProfilePath() {
+      return /databases/$(database)/documents/agents/$(request.auth.uid);
+    }
+
+    function hasActiveAgentProfile() {
+      return signedIn()
+        && exists(agentProfilePath())
+        && get(agentProfilePath()).data.active == true
+        && get(agentProfilePath()).data.role == request.auth.token.role;
+    }
+
+    function validAgentProfile(data) {
+      return data.keys().hasOnly([
+          'name', 'email', 'phone', 'role', 'active', 'createdAt', 'lastLoginAt'
+        ])
+        && data.keys().hasAll(['name', 'email', 'role', 'active'])
+        && !data.keys().hasAny(['password', 'passwordHash'])
+        && data.name is string
+        && data.name.size() <= 120
+        && data.email is string
+        && data.email.size() <= 254
+        && data.role in ['agent', 'lead', 'manager']
+        && data.active is bool
+        && (!data.keys().hasAny(['phone']) || (data.phone is string && data.phone.size() <= 40))
+        && (!data.keys().hasAny(['createdAt']) || data.createdAt is number)
+        && (!data.keys().hasAny(['lastLoginAt']) || data.lastLoginAt is number || data.lastLoginAt == null);
+    }
+
+    function validRequestedStatus(status) {
+      return status in ['מתקינים', 'לא מתקינים'];
+    }
+
+    function validRequestContext(type, data) {
+      return !data.keys().hasAny(['context'])
+        || (
+          data.context is map
+          && (
+            (
+              type == 'settlement'
+              && data.context.keys().hasOnly(['status'])
+              && (!data.context.keys().hasAny(['status']) || (data.context.status is string && data.context.status.size() <= 120))
+            )
+            || (
+              type == 'roof'
+              && data.context.keys().hasOnly(['outcome', 'answers'])
+              && (!data.context.keys().hasAny(['outcome']) || (data.context.outcome is string && data.context.outcome.size() <= 40))
+              && (!data.context.keys().hasAny(['answers']) || (data.context.answers is list && data.context.answers.size() <= 50))
+            )
+          )
+        );
+    }
+
+    function validRequestCreate(data) {
+      return data.keys().hasOnly([
+          'type', 'agentId', 'agentName', 'subject', 'reason', 'requestedStatus',
+          'context', 'status', 'resolution', 'managerNote', 'createdAt', 'resolvedAt'
+        ])
+        && data.keys().hasAll(['type', 'agentId', 'agentName', 'subject', 'reason', 'status', 'createdAt'])
+        && data.type in ['settlement', 'roof']
+        && data.agentId == request.auth.uid
+        && hasActiveAgentProfile()
+        && data.agentName == get(agentProfilePath()).data.name
+        && data.agentName is string
+        && data.agentName.size() <= 120
+        && data.subject is string
+        && data.subject.size() <= 500
+        && data.reason is string
+        && data.reason.size() > 0
+        && data.reason.size() <= 2000
+        && data.status == 'pending'
+        && data.resolution == null
+        && data.managerNote == ''
+        && data.createdAt is number
+        && data.resolvedAt == null
+        && validRequestContext(data.type, data)
+        && (
+          (data.type == 'settlement' && validRequestedStatus(data.requestedStatus)) ||
+          (data.type == 'roof' && data.requestedStatus == null)
+        );
+    }
+
+    function validRequestDecision(data) {
+      return data.status in ['approved', 'rejected']
+        && data.managerNote is string
+        && data.managerNote.size() <= 500
+        && data.resolvedAt is number
+        && (
+          (data.status == 'approved' && data.resolution in ['one-off', 'permanent']) ||
+          (data.status == 'rejected' && data.resolution == null)
+        );
+    }
+
+    function validReviewerDecision(data) {
+      return validRequestDecision(data)
+        && (request.auth.token.role == 'manager' || data.resolution != 'permanent');
+    }
+
+    function validSettlementOverride(data) {
+      return data.keys().hasOnly(['status', 'note', 'updatedBy', 'updatedAt'])
+        && data.keys().hasAll(['status', 'note', 'updatedBy', 'updatedAt'])
+        && validRequestedStatus(data.status)
+        && data.note is string
+        && data.note.size() <= 2000
+        && data.updatedBy is string
+        && data.updatedBy.size() <= 120
+        && data.updatedAt is number;
+    }
+
+    function validAuditEvent(data) {
+      return data.keys().hasOnly([
+          'action', 'targetType', 'targetId', 'actorId', 'actorName',
+          'actorRole', 'details', 'createdAt'
+        ])
+        && data.keys().hasAll([
+          'action', 'targetType', 'targetId', 'actorId', 'actorName',
+          'actorRole', 'createdAt'
+        ])
+        && data.action in [
+          'request.approve',
+          'request.reject',
+          'agent.create',
+          'agent.update',
+          'agent.activate',
+          'agent.deactivate',
+          'agent.delete',
+          'roofConfig.update'
+        ]
+        && data.targetType in ['request', 'agent', 'roofConfig', 'settlementOverride']
+        && data.targetId is string
+        && data.targetId.size() <= 200
+        && data.actorId == request.auth.uid
+        && data.actorName is string
+        && data.actorName.size() <= 120
+        && data.actorRole in ['lead', 'manager']
+        && data.actorRole == request.auth.token.role
+        && data.createdAt is number
+        && validAuditDetails(data);
+    }
+
+    function validAuditDetails(data) {
+      return !data.keys().hasAny(['details'])
+        || (
+          data.details is map
+          && data.details.keys().hasOnly([
+            'type', 'subject', 'resolution', 'permanentOverride',
+            'name', 'email', 'role', 'firebaseAuthUid', 'passwordChanged',
+            'archived', 'materials', 'good', 'borderline'
+          ])
+          && (!data.details.keys().hasAny(['type']) || (data.details.type in ['settlement', 'roof']))
+          && (!data.details.keys().hasAny(['subject']) || (data.details.subject is string && data.details.subject.size() <= 500))
+          && (!data.details.keys().hasAny(['resolution']) || (data.details.resolution in ['one-off', 'permanent']))
+          && (!data.details.keys().hasAny(['permanentOverride']) || data.details.permanentOverride is bool)
+          && (!data.details.keys().hasAny(['name']) || (data.details.name is string && data.details.name.size() <= 120))
+          && (!data.details.keys().hasAny(['email']) || (data.details.email is string && data.details.email.size() <= 254))
+          && (!data.details.keys().hasAny(['role']) || (data.details.role in ['agent', 'lead', 'manager']))
+          && (!data.details.keys().hasAny(['firebaseAuthUid']) || (data.details.firebaseAuthUid is string && data.details.firebaseAuthUid.size() <= 128))
+          && (!data.details.keys().hasAny(['passwordChanged']) || data.details.passwordChanged is bool)
+          && (!data.details.keys().hasAny(['archived']) || data.details.archived is bool)
+          && (!data.details.keys().hasAny(['materials']) || (data.details.materials is number && data.details.materials >= 0 && data.details.materials <= 50))
+          && (!data.details.keys().hasAny(['good']) || (data.details.good is number && data.details.good > 0 && data.details.good <= 1000))
+          && (!data.details.keys().hasAny(['borderline']) || (data.details.borderline is number && data.details.borderline > 0 && data.details.borderline <= 1000))
+        );
+    }
+
+    function validRoofConfig(data) {
+      return data.keys().hasOnly([
+          'totalSizeThresholds', 'tilesAgeWarning', 'managerPassword',
+          'materials', 'updatedAt'
+        ])
+        && data.keys().hasAll(['totalSizeThresholds', 'tilesAgeWarning', 'managerPassword', 'materials'])
+        && data.totalSizeThresholds is map
+        && data.totalSizeThresholds.keys().hasOnly(['good', 'borderline'])
+        && data.totalSizeThresholds.keys().hasAll(['good', 'borderline'])
+        && data.totalSizeThresholds.good is number
+        && data.totalSizeThresholds.good > 0
+        && data.totalSizeThresholds.good <= 1000
+        && data.totalSizeThresholds.borderline is number
+        && data.totalSizeThresholds.borderline > 0
+        && data.totalSizeThresholds.borderline <= data.totalSizeThresholds.good
+        && data.tilesAgeWarning is number
+        && data.tilesAgeWarning > 0
+        && data.tilesAgeWarning <= 150
+        && data.managerPassword == ''
+        && data.materials is list
+        && data.materials.size() > 0
+        && data.materials.size() <= 50
+        && (!data.keys().hasAny(['updatedAt']) || data.updatedAt is number);
+    }
+
     match /agents/{agentId} {
       allow read: if isManager() || isSelf(agentId);
-      allow create, update, delete: if isManager();
+      allow create, update: if isManager() && validAgentProfile(request.resource.data);
+      allow update: if isSelf(agentId)
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['lastLoginAt'])
+        && request.resource.data.lastLoginAt is number
+        && validAgentProfile(request.resource.data);
+      allow delete: if false;
     }
 
     match /requests/{requestId} {
-      allow create: if signedIn()
-        && request.resource.data.agentId == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.createdAt is number;
+      allow create: if validRequestCreate(request.resource.data);
 
       allow read: if isLeadOrManager()
         || (signedIn() && resource.data.agentId == request.auth.uid);
 
       allow update: if isLeadOrManager()
+        && resource.data.status == 'pending'
+        && resource.data.resolution == null
+        && resource.data.resolvedAt == null
         && request.resource.data.diff(resource.data).changedKeys()
           .hasOnly(['status', 'resolution', 'managerNote', 'resolvedAt'])
-        && request.resource.data.status in ['approved', 'rejected'];
+        && validReviewerDecision(request.resource.data);
 
       allow delete: if false;
     }
 
     match /settlementOverrides/{name} {
       allow read: if signedIn();
-      allow create, update, delete: if isManager();
+      allow create, update: if isManager() && validSettlementOverride(request.resource.data);
+      allow delete: if isManager();
     }
 
     match /roofConfig/{docId} {
       allow read: if signedIn();
-      allow create, update, delete: if isManager();
+      allow create, update: if isManager()
+        && docId == 'default'
+        && validRoofConfig(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /auditLogs/{eventId} {
+      allow create: if isLeadOrManager() && validAuditEvent(request.resource.data);
+      allow read: if isManager();
+      allow update, delete: if false;
     }
 
     match /{document=**} {

@@ -1,0 +1,10 @@
+{
+  "claims": {
+    "firebase-auth-uid-manager": {
+      "role": "manager"
+    },
+    "firebase-auth-uid-agent": {
+      "role": "agent"
+    }
+  }
+}
